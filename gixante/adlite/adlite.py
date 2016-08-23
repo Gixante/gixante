@@ -7,7 +7,6 @@ from flask import Flask, request, url_for, render_template
 from gixante.utils.parsing import classifierSplitter, log
 from gixante.utils.arango import database, scoreBatch, getPivots, cfg
 
-from pprint import pprint
 from collections import Counter
 from random import sample
 
@@ -31,9 +30,9 @@ weights, voc, coordModel = pickle.load(gzip.open(os.path.join(cfg['dataDir'], 'f
 opposites = [ tuple(l.strip().split(',')) for l in open(os.path.join(cfg['dataDir'], 'opposites.csv'), 'r') ]
 shifts = np.vstack([ weights[ voc[opp[1]] ] - weights[ voc[opp[0]] ] for opp in opposites ])
 vocInv = dict([ (k, w) for w, k in voc.items() ])
-pivotVecs, pivotPartitionIds, pivotCounts = getPivots(docCollName)
-pickle.dump((pivotVecs, pivotPartitionIds, pivotCounts), open('/tmp/pivots.pkl', 'wb'))
-#pivotVecs, pivotPartitionIds, pivotCounts =  pickle.load(open('/tmp/pivots.pkl', 'rb'))
+#pivotVecs, pivotPartitionIds, pivotCounts = getPivots(docCollName)
+#pickle.dump((pivotVecs, pivotPartitionIds, pivotCounts), open('/tmp/pivots.pkl', 'wb'))
+pivotVecs, pivotPartitionIds, pivotCounts =  pickle.load(open('/tmp/pivots.pkl', 'rb'))
 Qend = " {{'URL': doc.URL, 'sentences': slice(doc.sentences, 0, 10), 'title': doc.title}}"
 closestQ = "FOR doc in %s FILTER doc.partition in {0} FILTER doc.contentLength > 500 FILTER doc.title != NULL RETURN" % docCollName + Qend
 urlQ = "FOR doc in %s FILTER doc.URL IN {0} RETURN" % docCollName + Qend
@@ -125,8 +124,8 @@ def contact():
 
 @app.route('/add_contact', methods=['POST', 'GET'])
 def add_contact():
-    print(request.form)
-    return(render_template('contact.html'))
+    res = queryDataColl.create_document(request.form)
+    return(render_template('thankyou.html'))
 
 # AD DEMO
 @app.route('/ad_demo')
@@ -136,7 +135,6 @@ def ad_demo():
 
 @app.route('/ad_initial', methods=['POST', 'GET'])
 def ad_initial():
-    print(request.form)
     queryData = dict()
     queryData['createdTs'] = time.time()
     queryData['paragraph'] = request.form['paragraph']
@@ -191,7 +189,6 @@ def ad_semantic(queryId):
         docs, vecs = scoreBatch(docs, voc, weights)
         
         posVec, negVec, posContext, negContext = contextRank(queryData['semaSearch'][-1], np.array(queryData['searchVec']))
-        print(len(posContext))
         if len(posContext) > 0:
             posSim = vecs.dot(posVec)
             negSim = vecs.dot(negVec)
