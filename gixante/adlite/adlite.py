@@ -160,7 +160,7 @@ def ad_fetch(queryId):
     newDocs, newVecs = scoreBatch(list(database.execute_query(q)), voc, weights, scoreType='mean')
     newDocSimil = newVecs.dot(np.array(queryData['searchVec']))
     currentSimil = [ doc['similarity'] for doc in queryData['docs'] ]
-    nonDupes = np.where(~np.in1d(np.round(newDocSimil, 3), np.round(currentSimil, 3)))[0]
+    nonDupes = np.where(~np.in1d(np.round(newDocSimil, 8), np.round(currentSimil, 8)))[0]
     
     for ix in nonDupes:
         # PATCH: some titles are in a list (old format I guess)
