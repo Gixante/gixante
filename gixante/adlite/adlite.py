@@ -1,11 +1,11 @@
 
-import os, sys, pickle, re, time
+import os, sys, pickle, re, time, gzip
 import numpy as np
 
 sys.path.append('/home/bean/Code/Python')
 from flask import Flask, request, url_for, render_template
 from gixante.utils.parsing import classifierSplitter, log
-from gixante.utils.arango import database, scoreBatch, getPivots
+from gixante.utils.arango import database, scoreBatch, getPivots, cfg
 
 from pprint import pprint
 from collections import Counter
@@ -26,8 +26,9 @@ app.config.update(dict(
 docCollName = 'news'
 coll = database.col(docCollName)
 queryDataColl = database.col('demoData')
-weights, voc, coordModel = pickle.load(open('/home/bean/catapi_data/forManager.pkl', 'rb'))
-opposites = [ tuple(l.strip().split(',')) for l in open('/home/bean/catapi_data/opposites.csv', 'r') ]
+#weights, voc, coordModel = pickle.load(open(os.path.join(cfg['dataDir'], 'forManager.pkl'), 'rb'))
+weights, voc, coordModel = pickle.load(gzip.open(os.path.join(cfg['dataDir'], 'forAdlite.pkl.gz'), 'rb'))
+opposites = [ tuple(l.strip().split(',')) for l in open(os.path.join(cfg['dataDir'], 'opposites.csv'), 'r') ]
 shifts = np.vstack([ weights[ voc[opp[1]] ] - weights[ voc[opp[0]] ] for opp in opposites ])
 vocInv = dict([ (k, w) for w, k in voc.items() ])
 pivotVecs, pivotPartitionIds, pivotCounts = getPivots(docCollName)
