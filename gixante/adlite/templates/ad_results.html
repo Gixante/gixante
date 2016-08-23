@@ -57,5 +57,7 @@
 <br/>
 
 <hr class="featurette-divider">
-
+{% if _callN < 15 %}
+	<meta http-equiv="refresh" content="1;url={{ url_for('ad_fetch', queryId=_queryId) }}" />
+{% endif %}
 {% endblock %}

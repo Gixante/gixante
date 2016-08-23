@@ -175,7 +175,7 @@ def ad_fetch(queryId):
     queryData['nGoodResults'] = len([ d for d in queryData['docs'] if d['similarity'] > results[-1]['similarity']/2 ])
     queryData['callN'] += 1
     queryDataColl.update_document(queryId, queryData)
-    return(render_template('ad_results.html', **{'paragraph': queryData['paragraph'], 'results': results, 'nResults': queryData['nGoodResults'], '_queryId': queryId}))
+    return(render_template('ad_results.html', **{'paragraph': queryData['paragraph'], 'results': results, 'nResults': queryData['nGoodResults'], '_queryId': queryId, '_callN': queryData['callN']}))
 
 @app.route('/ad_semantic/<queryId>', methods=['POST', 'GET'])
 def ad_semantic(queryId):
