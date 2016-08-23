@@ -1,0 +1,71 @@
+{% set navigation_bar = [
+    ('about', 'About'),
+    ('publishers', 'Publishers'),
+    ('advertisers', 'Advertisers'),
+    ('ad_demo', 'Demo'),
+    ('why', 'Why'),
+    ('contact', 'Contact')
+] -%}
+
+<!DOCTYPE html>
+<head>
+	<meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+	
+	<meta name="description" content="">
+    <meta name="author" content="Gixante LTD">
+    <link rel="icon" href="../../favicon.ico">
+
+    <!-- Bootstrap core CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+
+	{% block head %}
+	{% endblock %}
+
+</head>
+
+<body><div class="container">
+		{% block navbar %}
+		  <nav class="navbar navbar-default">
+			<div class="container-fluid">
+			  <div class="navbar-header">
+				<button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+				  <span class="sr-only">Toggle navigation</span>
+				  <span class="icon-bar"></span>
+				  <span class="icon-bar"></span>
+				  <span class="icon-bar"></span>
+				</button>
+				<a class="navbar-brand" href="{{ url_for('index') }}">lli</a>
+			  </div>
+			  <div id="navbar" class="navbar-collapse collapse">
+				<ul class="nav navbar-nav navbar-right">
+					{% for route, caption in navigation_bar %}
+					  <li{% if route == active_page %} class="active"{% endif%}><a href="{{ url_for(route) }}">{{ caption|e }}</a></li>
+					{% endfor %}
+<!--				  <li><a href="{{ url_for('about') }}">About</a></li>
+				  <li><a href="{{ url_for('publishers') }}">Publishers</a></li>
+				  <li><a href="{{ url_for('advertisers') }}">Advertisers</a></li>
+				  <li><a href="{{ url_for('why') }}">Why</a></li>
+				  <li><a href="{{ url_for('contact') }}">Contact</a></li> -->
+				</ul>
+			  </div><!--/.nav-collapse -->
+			</div><!--/.container-fluid -->
+		  </nav>
+		{% endblock %}
+		
+		{% block body %}
+		{% endblock %}
+
+	  {% block footer %}
+	  <footer>
+		<p class="pull-right"><a href="#">Back to top</a></p>
+		<p>&copy; 2016 Adlite is powered by <a href="http://www.gixante.com" target="_blank">Gixante Ltd</a></p>
+	  </footer>
+	  {% endblock %}
+	
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+	<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+</div></body>
+

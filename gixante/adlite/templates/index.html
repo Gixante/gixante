@@ -1,0 +1,33 @@
+{% extends "layout.html" %}
+
+{% block head %}
+<title>Adlite | Home</title>
+<link href="{{ url_for('static', filename='cover.css') }}" rel="stylesheet">
+{% endblock %}
+
+{% block navbar %}
+</br></br></br></br></br></br></br></br></br>
+{% endblock %}
+
+{% block body %}
+
+<div class="site-wrapper">
+  <div class="site-wrapper-inner">
+	<div class="cover-container">
+	  <div class="inner cover">
+		<h1 class="cover-heading xl">Adlite.</h1>
+		<p class="lead">We deliver quality content from advertisers in a contextually relevant manner. Nothing else. Job No. 1 is to get the good stuff to you. <a href="about.html"></a></p>
+		<p class="lead">
+		  <a href="{{ url_for('publishers') }}" class="btn btn-lg btn-default">For publishers</a>
+		  <a href="{{ url_for('advertisers') }}" class="btn btn-lg btn-default">For advertisers</a>
+		  <a href="{{ url_for('about') }}" class="btn btn-lg btn-default">How it works</a>
+		</p>
+	  </div>
+	</div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block footer %}
+{% endblock %}

@@ -1,0 +1,51 @@
+{% extends "layout.html" %}
+{% set active_page = "advertisers" %}
+
+{% block head %}
+<title>Adlite | For advertisers</title>
+<link href="{{ url_for('static', filename='navbar.css') }}" rel="stylesheet">
+{% endblock %}
+
+{% block body %}
+  <!-- Main component for a primary marketing message or call to action -->
+  <div class="jumbotron">
+	<h1>For advertisers</h1>
+	<p>Adlite is about content-based ads. It is a new way to promote branded content across multiple publishers, merging the quality of sponsored content with the reach of display advertising.</p>
+	<div style="float: left; padding: 5px;"><p><a class="btn btn-primary btn-lg" href="{{ url_for('ad_demo') }}" role="button">Try the online demo now</a></p></div>
+	<div style="float: left; padding: 5px;"><p><a class="btn btn-primary btn-lg" href="{{ url_for('contact') }}"  role="button">Request a full demo &raquo;</a></p></div>
+	</br>
+  </div>
+  
+  <!-- START THE FEATURETTES -->
+
+  <div class="row featurette">
+	<div class="col-md-7">
+	  <h2 class="featurette-heading">Unparalleled performance. <span class="text-muted">Unprecedented level.</span></h2>
+	  <p class="lead">You write killer content that people care about. Adlite's NLP engine profiles it and finds relevant articles among top publishers’ inventory. We promote your content using Adlite’s native ad feed on publishers’ sites - directly and at scale. Delivering performance that only sponsored content can reach. </p>
+	</div>
+	<div class="col-md-5">
+	</div>
+  </div>
+
+  <div class="row featurette">
+	<div class="col-md-7 col-md-push-5">
+	  <h2 class="featurette-heading">Open and transparent. <span class="text-muted">See for yourself.</span></h2>
+	  <p class="lead">We profile millions of publishers' pages in real time using our NLP technology. You can use semantic matches, broad keyword searches or your own categories to actively choose your campaign’s placements and bids - even with page by page granularity for the highest brand protection. You can also dynamically match your criteria to make sure your campaign has access to articles hot off the press. </p>
+	</div>
+	<div class="col-md-5 col-md-pull-7">
+	</div>
+  </div>
+
+  <div class="row featurette">
+	<div class="col-md-7">
+	  <h2 class="featurette-heading">In the right place at the right time. <span class="text-muted">Making the most of every opportunity.</span></h2>
+	  <p class="lead">Thanks to direct placement, you can finally track your campaign performance with absolute accuracy and have immediate feedback. But there’s much more: using this clean historical data and external sources, our predictive algorithms can help you optimise placement, timing and messaging. </p>
+	</div>
+	<div class="col-md-5">
+	</div>
+  </div>
+
+  <hr class="featurette-divider">
+
+  <!-- /END THE FEATURETTES -->
+{% endblock %}

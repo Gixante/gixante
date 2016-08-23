@@ -1,0 +1,50 @@
+{% extends "layout.html" %}
+{% set active_page = "publishers" %}
+
+{% block head %}
+<title>Adlite | For publishers</title>
+<link href="{{ url_for('static', filename='navbar.css') }}" rel="stylesheet">
+{% endblock %}
+
+{% block body %}
+  <!-- Main component for a primary marketing message or call to action -->
+  <div class="jumbotron">
+	<h1>For publishers</h1>
+	<p>We have created a new channel for brands to promote high quality content on your pages. We have designed Adlite so you are in control of your inventory and make sure it gets the right price. </p>
+	<div style="float: left; padding: 5px;"><p><a class="btn btn-primary btn-lg" href="{{ url_for('ad_demo') }}" role="button">Try the online demo now</a></p></div>
+	<div style="float: left; padding: 5px;"><p><a class="btn btn-primary btn-lg" href="{{ url_for('contact') }}"  role="button">Request a full demo &raquo;</a></p></div>
+	</br>
+  </div>
+  
+  <!-- START THE FEATURETTES -->
+  <div class="row featurette">
+	<div class="col-md-7">
+	  <h2 class="featurette-heading">More engagement. <span class="text-muted">More value.</span></h2>
+	  <p class="lead">Content based advertising is designed to drive more engagement, a precious commodity that commands premium rates from advertisers. Also, the direct link with advertisers allows for operational cost savings that are efficiently passed on to both parties. </p> 
+	</div>
+	<div class="col-md-5">
+	</div>
+  </div>
+
+  <div class="row featurette">
+	<div class="col-md-7 col-md-push-5">
+	  <h2 class="featurette-heading">Tailored to fit editorial content. <span class="text-muted">Ad tech like never before.</span></h2>
+	  <p class="lead">We create content rich native ads from branded content. Our NLP engine matches the most relevant for each of your content page, one by one. You have full visibility and control over the process and the format. As a result, your users will see branded content that you find relevant to editorial content. High quality content promotes trust between publishers and readers while engaging them. No blind ad networks, no interruptive ads. </p>
+	</div>
+	<div class="col-md-5 col-md-pull-7">
+	</div>
+  </div>
+
+  <div class="row featurette">
+	<div class="col-md-7">
+	  <h2 class="featurette-heading">Fast. <span class="text-muted">Lightning fast.</span></h2>
+	  <p class="lead">Adlite was designed with performance in mind. Our algorithms profile content as it's produced: branded content relevant to each article is ready before users start to browse. Adlite moves from cookie based advertising to content aware advertising - in other words, ads are specific to a page and not a user. This means no RTB and no other layers that slow down your content. Welcome to the new way forward. </p>
+	</div>
+	<div class="col-md-5">
+	</div>
+  </div>
+
+  <hr class="featurette-divider">
+  <!-- /END THE FEATURETTES -->
+
+{% endblock %}

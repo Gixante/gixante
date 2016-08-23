@@ -1,0 +1,60 @@
+{% extends "layout.html" %}
+{% set active_page = "ad_demo" %}
+
+{% block head %}
+<title>Adlite | Demo for advertisers</title>
+<link href="{{ url_for('static', filename='navbar.css') }}" rel="stylesheet">
+{% endblock %}
+
+{% block body %}
+
+<div class="jumbotron">
+  <div class="container">
+	<h1 class="display-3">Creating your bespoke inventory...</h1>
+	<p class="text-muted">Your content:</p>
+	<blockquote >"{{ paragraph }}"</blockquote>
+	<p class="text-muted">is relevant to at least <b>{{ nResults }}</b> articles. Have a look at some of the most relevant found so far!</p>
+	<p class="text-muted">You can now see how our free text filters allow you to <a href="{{ url_for('ad_semantic', queryId=_queryId) }}">select the best ones.</a></p>
+	<p class="text-muted">If you'd like to see more results, <a href="{{ url_for('ad_fetch', queryId=_queryId) }}">keep searching</a>.</p>
+	<p class="text-muted">If you think these articles are not that relevant, try <a href="{{ url_for('ad_demo') }}">adding more text to your initial query or starting all over again.</a></p>
+  
+  </div>
+</div>
+
+<div class="jumbotron">
+	<h2 class="display-2">Some of the best ones:</h2>
+	<ul>
+	{% for res in results %}
+		<li><a href="{{ res.URL }}" target="_blank">{{ res.title }}</a></li>
+	{% endfor %}
+	</ul>
+</div>
+
+<div style="float: left; padding: 5px;">
+<form action="{{ url_for('ad_demo') }}">
+    <button type="submit" class="btn btn-primary btn-lg">Start over with a new search</button>
+</form>
+</div>
+
+<div style="float: left; padding: 5px;">
+<form action="{{ url_for('ad_fetch', queryId=_queryId) }}">
+    <button type="submit" class="btn btn-primary btn-lg">Fetch more results</button>
+</form>
+</div>
+
+<div style="float: left; padding: 5px;">
+<form action="{{ url_for('ad_semantic', queryId=_queryId) }}">
+    <button type="submit" class="btn btn-primary btn-lg">Try semantic filters</button>
+</form>
+</div>
+
+</p>	
+
+<br/>
+
+<br/>
+
+<br/>
+
+
+{% endblock %}

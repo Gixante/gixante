@@ -1,0 +1,30 @@
+{% extends "layout.html" %}
+{% set active_page = "ad_demo" %}
+
+{% block head %}
+<title>Adlite | Demo for advertisers</title>
+<link href="{{ url_for('static', filename='navbar.css') }}" rel="stylesheet">
+{% endblock %}
+
+{% block body %}
+
+<div class="jumbotron">
+	<div class="container">
+		<h1>Adlite in practice</h1>
+		<p class="text-muted">We will demonstrate how our semantic engine is able to match your content to relevant news from top publishers.</p>
+		<p class="text-muted">To get started, enter some text in the box below and we will search {{ nDocs }} news articles to find the most relevant ones. You can copy an entire piece of content or type directly.</p>
+		<p class="text-muted">These results are natural candidates to promote your branded content; but we'll show you how to use our free text filters to really fine tune the results.</p>
+		
+		{% if error %}
+			<p><code>{{ error }}</code></p>
+		{% endif %}
+
+		<form action="{{ url_for('ad_initial') }}" method="post">
+			<textarea class="form-control" rows="6" name="paragraph" placeholder="For instance, I'd like to be at a beach with icing sugar sand, crystal-clear water, off-shore coral reef with spectacular snorkelling or diving, and a smattering of bars and open-air restaurants!"></textarea>
+			<br/>
+			<button type="submit" class="btn btn-primary btn-lg">Start exploring</button>
+		</form>
+	</div>
+</div>
+
+{% endblock %}
