@@ -142,6 +142,7 @@ class SimilToText(Resource):
             queryData = apiColl.get_first_example({'_key': queryId})
             totNumDocs = max(len(queryData['docs']) + nMoreDocs, minNumDocs)
             if len(queryData['docs']) < totNumDocs and not ('queryInProgress' in queryData and queryData['queryInProgress']):
+                queryData['queryInProgress'] = True
                 t = threading.Thread(target=lazyMatch, args=(queryId, queryData, totNumDocs), name=queryId, daemon=True)
                 t.start()
             

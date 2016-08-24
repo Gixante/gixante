@@ -11,7 +11,9 @@
   <div class="jumbotron">
 	<h1>See how it works</h1>
 	<p>Are you a publisher? Keep writing great content. Are you an advertiser? Keep writing great content. We do the rest. We have just created a new channel that unlocks new revenue opportunities for publishers and advertisers. Keep writing great content that people can really engage with.</p>
-	<div style="float: left; padding: 5px;"><p><a class="btn btn-primary btn-lg" href="{{ url_for('ad_demo') }}" role="button">Try the online demo now</a></p></div>
+	{% if APIstatus() == "OK" %}
+		<div style="float: left; padding: 5px;"><p><a class="btn btn-primary btn-lg" href="{{ url_for('ad_demo') }}" role="button">Try the online demo now</a></p></div>
+	{% endif %}
 	<div style="float: left; padding: 5px;"><p><a class="btn btn-primary btn-lg" href="{{ url_for('contact') }}"  role="button">Request a full demo &raquo;</a></p></div>
 	</br>
   </div>

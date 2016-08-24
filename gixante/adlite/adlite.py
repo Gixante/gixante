@@ -2,19 +2,28 @@ from flask import Flask, request, url_for, render_template
 from requests import put, get
 
 apiRoot = 'http://80.192.114.42:5000'
+def APIstatus():
+    try:
+        return(get(apiRoot + '/getCollStats').reason)
+    except:
+        return("Not up!")
 
 ### test the API
-testStat = get(apiRoot + '/getCollStats').json()
-testStatAdd = put(apiRoot + '/addSiteStat/site=adlite', data={'dummyField': 'dummyValue'}).json()
-testPut = put(apiRoot + '/put/csvWords=this,is,a,dummy,test').json()
-testGet = get(apiRoot + '/get/id={0}/fields=text,queryInProgress,nDocs,_key/minNumDocs={1}/nMoreDocs={2}/docFields=URL,title'.format(testPut['_key'], 10, 25)).json()
-testGetFast = get(apiRoot + '/get/id={0}/fields=queryInProgress,text'.format(testPut['_key'])).json()
-testSema = get(apiRoot + '/semantic/id={0}/nEachSide={1}/minNumDocs={2}/rankPctDocs={3}'.format(testPut['_key'], 10, 25, 0.5), data={'semaSearch': 'cool'}).json()
-queryId = testPut['_key']
+
+print("API on {0} says: {1}".format(apiRoot, APIstatus()))
+# testStat = get(apiRoot + '/getCollStats').json()
+# testStatAdd = put(apiRoot + '/addSiteStat/site=adlite', data={'dummyField': 'dummyValue'}).json()
+# testPut = put(apiRoot + '/put/csvWords=this,is,a,dummy,test').json()
+# testGet = get(apiRoot + '/get/id={0}/fields=text,queryInProgress,nDocs,_key/minNumDocs={1}/nMoreDocs={2}/docFields=URL,title'.format(testPut['_key'], 10, 25)).json()
+# testGetFast = get(apiRoot + '/get/id={0}/fields=queryInProgress,text'.format(testPut['_key'])).json()
+# testSema = get(apiRoot + '/semantic/id={0}/nEachSide={1}/minNumDocs={2}/rankPctDocs={3}'.format(testPut['_key'], 10, 25, 0.5), data={'semaSearch': 'cool'}).json()
+# queryId = testPut['_key']
 ###
 
 app = Flask(__name__)
 app.config.from_object(__name__)
+
+app.jinja_env.globals.update(APIstatus=APIstatus)
 
 nGet = 1000
 nReturnDocs = 25
@@ -27,7 +36,7 @@ def index():
 
 @app.route('/publishers')
 def publishers():
-    return render_template('publishers.html', showNavBar=None)
+    return render_template('publishers.html')
 
 @app.route('/advertisers')
 def advertisers():

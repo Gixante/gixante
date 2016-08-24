@@ -1,11 +1,21 @@
-{% set navigation_bar = [
-    ('about', 'About'),
-    ('publishers', 'Publishers'),
-    ('advertisers', 'Advertisers'),
-    ('ad_demo', 'Demo'),
-    ('why', 'Why'),
-    ('contact', 'Contact')
-] -%}
+{% if APIstatus() == "OK" %}
+	{% set navigation_bar = [
+		('about', 'About'),
+		('publishers', 'Publishers'),
+		('advertisers', 'Advertisers'),
+		('ad_demo', 'Demo'),
+		('why', 'Why'),
+		('contact', 'Contact')
+	] -%}
+{% else %}
+	{% set navigation_bar = [
+		('about', 'About'),
+		('publishers', 'Publishers'),
+		('advertisers', 'Advertisers'),
+		('why', 'Why'),
+		('contact', 'Contact')
+	] -%}
+{% endif %}
 
 <!DOCTYPE html>
 <head>
@@ -44,11 +54,6 @@
 					{% for route, caption in navigation_bar %}
 					  <li{% if route == active_page %} class="active"{% endif%}><a href="{{ url_for(route) }}">{{ caption|e }}</a></li>
 					{% endfor %}
-<!--				  <li><a href="{{ url_for('about') }}">About</a></li>
-				  <li><a href="{{ url_for('publishers') }}">Publishers</a></li>
-				  <li><a href="{{ url_for('advertisers') }}">Advertisers</a></li>
-				  <li><a href="{{ url_for('why') }}">Why</a></li>
-				  <li><a href="{{ url_for('contact') }}">Contact</a></li> -->
 				</ul>
 			  </div><!--/.nav-collapse -->
 			</div><!--/.container-fluid -->
