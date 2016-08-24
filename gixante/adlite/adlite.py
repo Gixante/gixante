@@ -35,7 +35,7 @@ def advertisers():
 
 @app.route('/about')
 def about():
-    nDocs = get(apiRoot + '/stats').json()['alive']['count']
+    nDocs = get(apiRoot + '/getCollStats').json()['alive']['count']
     millDocs = "{:,}".format((nDocs - nDocs % 1e5) / 1e6)
     return render_template('about.html', millDocs=millDocs)
     
@@ -55,7 +55,7 @@ def add_contact():
 # AD DEMO
 @app.route('/ad_demo')
 def ad_demo(error=None):
-    nDocs = "{:,}".format(get(apiRoot + '/stats').json()['alive']['count'])
+    nDocs = "{:,}".format(get(apiRoot + '/getCollStats').json()['alive']['count'])
     return render_template('ad_demo.html', nDocs=nDocs, error=error)
 
 @app.route('/ad_initial', methods=['POST', 'GET'])
