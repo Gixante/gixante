@@ -211,7 +211,7 @@ api.add_resource(Semantic,
     )
 
 if __name__ == '__main__':
-    app.run(debug=(sys.argv[-1]=='debug'))
+    app.run(host='0.0.0.0', port=5000, debug=(sys.argv[-1]=='debug'))
     
 log.info("Goodbye!") 
     

@@ -1,7 +1,7 @@
 from flask import Flask, request, url_for, render_template
 from requests import put, get
 
-apiRoot = 'http://localhost:5000'
+apiRoot = 'http://80.192.114.42:5000'
 
 ### test the API
 testStat = get(apiRoot + '/getCollStats').json()
