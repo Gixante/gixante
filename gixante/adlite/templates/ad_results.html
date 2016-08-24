@@ -12,10 +12,10 @@
   <div class="container">
 	<h1 class="display-3">Creating your bespoke inventory...</h1>
 	<p class="text-muted">Your content:</p>
-	<blockquote >"{{ paragraph }}"</blockquote>
-	<p class="text-muted">is relevant to at least <b>{{ nResults }}</b> articles. Have a look at some of the most relevant found so far!</p>
-	<p class="text-muted">You can now see how our free text filters allow you to <a href="{{ url_for('ad_semantic', queryId=_queryId) }}">select the best ones.</a></p>
-	<p class="text-muted">If you'd like to see more results, <a href="{{ url_for('ad_fetch', queryId=_queryId) }}">keep searching</a>.</p>
+	<blockquote >"{{ text }}"</blockquote>
+	<p class="text-muted">is linked to at least <b>{{ nDocs }}</b> articles. Have a look at some of the most relevant found so far!</p>
+	<p class="text-muted">You can now see how our free text filters allow you to <a href="{{ url_for('ad_semantic_intro', queryId=_key) }}">select the best ones.</a></p>
+	<p class="text-muted">If you'd like to see more results, <a href="{{ url_for('ad_fetch', queryId=_key) }}">keep searching</a>.</p>
 	<p class="text-muted">If you think these articles are not that relevant, try <a href="{{ url_for('ad_demo') }}">adding more text to your initial query or starting all over again.</a></p>
   
   </div>
@@ -24,8 +24,8 @@
 <div class="jumbotron">
 	<h2 class="display-2">Some of the best ones:</h2>
 	<ul>
-	{% for res in results %}
-		<li><a href="{{ res.URL }}" target="_blank">{{ res.title }}</a></li>
+	{% for doc in docs %}
+		<li><a href="{{ doc.URL }}" target="_blank">{{ doc.title }}</a></li>
 	{% endfor %}
 	</ul>
 </div>
@@ -37,13 +37,13 @@
 </div>
 
 <div style="float: left; padding: 5px;">
-<form action="{{ url_for('ad_fetch', queryId=_queryId) }}">
+<form action="{{ url_for('ad_fetch', queryId=_key) }}">
     <button type="submit" class="btn btn-primary btn-lg">Fetch more results</button>
 </form>
 </div>
 
 <div style="float: left; padding: 5px;">
-<form action="{{ url_for('ad_semantic', queryId=_queryId) }}">
+<form action="{{ url_for('ad_semantic_intro', queryId=_key) }}">
     <button type="submit" class="btn btn-primary btn-lg">Try semantic filters</button>
 </form>
 </div>
@@ -57,7 +57,7 @@
 <br/>
 
 <hr class="featurette-divider">
-{% if _callN < 15 %}
-	<meta http-equiv="refresh" content="1;url={{ url_for('ad_fetch', queryId=_queryId) }}" />
+{% if queryInProgress %}
+	<meta http-equiv="refresh" content="1;url={{ url_for('ad_fetch', queryId=_key, nMoreDocs=0) }}" />
 {% endif %}
 {% endblock %}

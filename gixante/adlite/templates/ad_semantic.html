@@ -13,20 +13,13 @@
 <div class="jumbotron">
   <div class="container">
 	<h1 class="display-3">Semantic Filters</h1>
-	<p class="text-muted">We started with your content:</p>
-	<blockquote >"{{ paragraph }}"</blockquote>
-	{% if semaSearch and posWords %}
-		<p class="text-muted">and ranked it by the meaning of:</p>
-		<blockquote>"{{ semaSearch }}"</blockquote>
-		<p class="text-muted">In this context, your criteria were understood as:</p>
-		<code>{{ posWords }}</code>
-	{% elif not error %}
-		<p class="text-muted">We have sampled {{ nGoodResults }} relevant articles - that means that if you promoted your content here, readers would be already engaged.</p>
-		<p class="text-muted">But of course, this is not enough. Is it a good idea for your content to be advertised on all of them? Does the author express opinions aligned with your brand values? What type of feelings can you expect readers to have? Are they your ideal audience?</p>
-		<p class="text-muted">We know that traditional categories used to sieve through online inventory are too rigid to capture all this - so we built our models to interface in a more human way.</p>
-		<p class="text-muted">Tell us what your vision for your campaign is: whether you want to describe your ideal audience, capture emotions, sentiment or values, describe it in a few words in the space below.</p>
-		<p class="text-muted">We will rank {{ nSemaDocs }} of the articles fetched so far based on the meaning of the words in this context. (And yes, your standard categories work here too).</p>
-
+	{% if not error %}
+		<p class="text-muted">We analysed {{ nDocs}} linked to your content:</p>
+		<blockquote >"{{ text }}"</blockquote>
+		<p class="text-muted">and ranked them by the meaning of:</p>
+		<blockquote>"{{ semaSearch[0] }}"</blockquote>
+		<p class="text-muted">In this context, <i><b>"{{ semaSearch[0] }}"</b></i> was understood as:</p>
+		<code>{{ posContext }}</code>
 	{% endif %}	
   </div>
 </div>
@@ -43,7 +36,7 @@
 {% endif %}
 
 {% if negDocs %}
-<!--	<p>While the semantic opposite is understood as: "{{ negWords }}"</p> -->
+<!--	<p>While the semantic opposite is understood as: "{{ negContext }}"</p> -->
 	<div class="jumbotron">
 		<h2>... and some far away:</h2>
 		<ul>
@@ -55,31 +48,30 @@
 {% endif %}
 
 {% if error %}
-	<p><code>{{ error }}</code></p>
+	<p><code>Cannot understand your search! Please note that this demo is for English only and case sensitive.</code></p>
 {% endif %}
 
+<form action="{{ url_for('ad_semantic', queryId=_key) }}" method="post">
+	<input class="form-control" type="text" placeholder='Try typing a few words like "positive", "skeptical", "happy" or "young and active"' name="semaSearch">
+	<br/>
+	<button type="submit" class="btn btn-primary btn-lg">Try another filter</button>
+</form>
+</br>
+
 {% if posDocs or negDocs %}
-	<form action="{{ url_for('ad_semantic', queryId=_queryId) }}" method="post">
-		<input class="form-control" type="text" placeholder='Try typing a few words like "positive", "skeptical", "happy" or "young and active"' name="semaSearch">
-		<br/>
-		<button type="submit" class="btn btn-primary btn-lg">Try another filter</button>
-	</form>
-	</br>
 	<div class="jumbotron">
 		<h2>Tips:</h2>
 		<p>If you think that your criteria were not understood, try using simpler synonyms.</p>
-		<p>If your criteria were understood reasonably well, but the results are disappointing, try <a href="{{ url_for('ad_fetch', queryId=_queryId) }}">fetching more documents</a> first.</p>
+		<p>If your criteria were understood reasonably well, but the results are disappointing, try <a href="{{ url_for('ad_fetch', queryId=_key) }}">fetching more documents</a> first.</p>
 		<p>If your initial content was not understood correctly, try <a href="{{ url_for('ad_demo') }}">adding more text</a> in your next search.</p>
 	</div>
-{% else %}
-	<form action="{{ url_for('ad_semantic', queryId=_queryId) }}" method="post">
-		<input class="form-control" type="text" placeholder='Try typing a few words like "positive", "skeptical", "happy" or "young and active"' name="semaSearch">
-		<br/>
-		<button type="submit" class="btn btn-primary btn-lg">Rank by the meaning of this filter</button>
-	</form>
 {% endif %}
 
 <hr class="featurette-divider">
+
+{% if queryInProgress %}
+	<meta http-equiv="refresh" content="1;url={{ url_for('ad_semantic', queryId=_key) }}" />
+{% endif %}
 
 {% endblock %}
 

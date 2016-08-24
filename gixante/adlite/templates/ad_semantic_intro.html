@@ -1,0 +1,35 @@
+{% extends "layout.html" %}
+{% set active_page = "ad_demo" %}
+
+{% block head %}
+<title>Adlite | Demo for advertisers</title>
+<link href="{{ url_for('static', filename='navbar.css') }}" rel="stylesheet">
+{% endblock %}
+
+{% block body %}
+
+<br/>
+
+<div class="jumbotron">
+  <div class="container">
+	<h1 class="display-3">Semantic Filters</h1>
+	<p class="text-muted">We started with your content:</p>
+	<blockquote >"{{ text }}"</blockquote>
+	<p class="text-muted">and retrieved {{ nDocs }} relevant articles - that means that if you promoted your content here, readers would be already engaged.</p>
+	<p class="text-muted">But of course, this is not enough. Is it a good idea for your content to be advertised on all of them? Does the author express opinions aligned with your brand values? What type of feelings can you expect readers to have? Are they your ideal audience?</p>
+	<p class="text-muted">We know that traditional categories used to sieve through online inventory are too rigid to capture all this - so we built our models to interface in a more human way.</p>
+	<p class="text-muted">Tell us what your vision for your campaign is: whether you want to describe your ideal audience, capture emotions, sentiment or values, describe it in a few words in the space below.</p>
+	<p class="text-muted">We will rank the articles fetched so far based on the meaning of the words in this context. (And yes, your standard categories work here too).</p>	
+  </div>
+</div>
+
+<form action="{{ url_for('ad_semantic', queryId=_key) }}" method="post">
+	<input class="form-control" type="text" placeholder='Try typing a few words like "positive", "skeptical", "happy" or "young and active"' name="semaSearch">
+	<br/>
+	<button type="submit" class="btn btn-primary btn-lg">Rank by the meaning of this filter</button>
+</form>
+
+<hr class="featurette-divider">
+
+{% endblock %}
+

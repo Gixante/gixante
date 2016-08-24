@@ -132,9 +132,12 @@ def missingFromAll(URLs, collectionName):
     notExistURLs = missing('URL', '^{0}$|^{0}Newbies$'.format(collectionName), URLs)
     return(set([ (url, skinny) for url, skinny in zip(URLs, skinnyURLs) if url in notExistURLs and skinny in nonErrorSkinnies ]))
 
-def count(collectionName):
-    q = "FOR doc in %s COLLECT WITH COUNT INTO c RETURN c"
-    return(next(database.execute_query(q % collectionName)))
+def count(collectionName, fast=True):
+    if fast:
+        return(database.col('news').statistics['alive']['count'])
+    else:
+        q = "FOR doc in %s COLLECT WITH COUNT INTO c RETURN c"
+        return(next(database.execute_query(q % collectionName)))
 
 def getCollection(collectionName, withPivots=True):
     
@@ -170,15 +173,50 @@ def createPivot(doc, vec, pivotColl, partitionId, nDocs):
     pivotColl.create_document(pivot)
     log.debug("Created a new pivot: partition={0}, nDocs: {1}".format(partitionId, nDocs))
 
-def getPivots(collectionName):
+def getPivots(collectionName, existPids=None, existVecs=None):
     
-    pivotQ = "FOR piv in %s RETURN {'embedding': piv.embedding, 'partition': piv.partition, 'nDocs': piv.nDocs}" % (collectionName + 'Pivots')
-    pivotDocs = list(database.execute_query(pivotQ))
-    pivotVecs = np.vstack([ p['embedding'] for p in pivotDocs ]).astype(np.float32)
-    pivotPartitionIds = np.array([ p['partition'] for p in pivotDocs ])
-    pivotCounts = dict(zip(pivotPartitionIds, [ p['nDocs'] for p in pivotDocs ]))
+    pivCollName = collectionName + 'Pivots'
     
-    return(pivotVecs, pivotPartitionIds, pivotCounts)
+    if existPids is None or existVecs is None:
+        log.info("Getting pivots from %s - from scratch" % pivCollName)
+        allPivotQ = "FOR piv in %s RETURN {'embedding': piv.embedding, 'partition': piv.partition, 'nDocs': piv.nDocs}" % pivCollName
+        pivotDocs = list(database.execute_query(allPivotQ))
+        pivotVecs = np.vstack([ p['embedding'] for p in pivotDocs ]).astype(np.float32)
+        pivotIds = np.array([ p['partition'] for p in pivotDocs ])
+        counts = [ p['nDocs'] for p in pivotDocs ]
+    else:
+        log.info("Getting pivots from %s - the fast way" % pivCollName)
+        allPivotQ = "FOR piv in %s RETURN {'partition': piv.partition, 'nDocs': piv.nDocs}" % pivCollName
+        embedQ = "FOR piv in %s FILTER piv.partition == {0} RETURN piv.embedding" % pivCollName
+        pidCounts = list(database.execute_query(allPivotQ))
+        
+        outList = []
+        for pc in tqdm(pidCounts):
+            if pc['partition'] in existPids:
+                ix = np.where(existPids == pc['partition'])[0][0]
+                outList.append( (existVecs[ix], pc['partition'], pc['nDocs']) )
+            else:
+                newVec = np.array(next(database.execute_query(embedQ.format(pc['partition']))))
+                outList.append( (newVec, pc['partition'], pc['nDocs']) )
+        
+        tmp = zip(*outList)
+        pivotVecs = np.vstack(next(tmp)).astype(np.float32)
+        pivotIds = np.array(next(tmp))
+        counts = np.array(next(tmp))
+    
+    pivotCounts = dict(zip(pivotIds, counts))
+    return(pivotVecs, pivotIds, pivotCounts)
+
+def checkPivotCount(collectionName, nRand=100):     
+    pColl = database.col(collectionName + 'Pivots')
+    allPivotQ = "FOR piv in %s RETURN {'partition': piv.partition, 'nDocs': piv.nDocs}" % pivCollName
+    pidCounts = list(database.execute_query(allPivotQ))
+    
+    for pc in tqdm(sample(pidCounts, 100)):
+        actualCount = next(database.execute_query("FOR doc in news filter doc.partition == {0} collect with count into c return c".format(pc['partition'])))
+        if actualCount != pc['nDocs']:
+            #log.warning("Doc count for pid {0} is off: {1} vs {2} (actual)".format(pc['partition'], pc['nDocs'], actualCount))
+            pColl.update_by_example({'partition': pc['partition']}, {'nDocs': actualCount})
 
 def getPivotIds(collectionName):
     return(np.array(list(database.execute_query("FOR p in %sPivots RETURN p.partition" % collectionName))))
