@@ -36,7 +36,7 @@ class HeartbeatSlow(HeartbeatError):
 def checkHeartbeat(url, guessHeartBeatURL=True):
     
     if guessHeartBeatURL:
-        hbURL = ''.join(re.split('(/)', url)[:6] + ['heartbeat'])
+        hbURL = ''.join(re.split('(/)', url)[:5] + ['/heartbeat'])
     else:
         hbURL = url
     

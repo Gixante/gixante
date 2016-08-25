@@ -3,15 +3,15 @@ import sys
 sys.path.append('/home/bean/Code/gixante/gixante/utils')
 from api import get, put, cfg, log
 
-#from gixante.utils.api import get, put, cfg, log
+from gixante.utils.api import get, put, cfg, log
 from gixante.utils.arango import cleanupTests, database
 
 if len(sys.argv) < 2: sys.argv.append("news")
 if len(sys.argv) < 3: sys.argv.append("adlite")
-if len(sys.argv) < 4: sys.argv.append("20")
+if len(sys.argv) < 4: sys.argv.append("20") # INFO logging level
 
-#apiRoot = 'http://{0}:{1}'.format(cfg[ sys.argv[1] + 'ApiIP' ], cfg[ sys.argv[1] + 'ApiPort' ])
-apiRoot = 'http://localhost:5000'
+apiRoot = 'http://{0}:{1}'.format(cfg[ sys.argv[1] + 'ApiIP' ], cfg[ sys.argv[1] + 'ApiPort' ])
+#apiRoot = 'http://localhost:5000'
 site = sys.argv[2]
 log.setLevel(int(sys.argv[3]))
 
@@ -37,4 +37,4 @@ testSema3 = get(apiRoot + '/semantic/id={0}/nEachSide=10/minNumDocs=100/rankPctD
 testSema4 = get(apiRoot + '/semantic/id={0}/nEachSide=10'.format(testSimilPost['_key']), data={'semaSearch': 'cool'})
 
 log.info("Cleaning up the database...")
-cleanupTests([ testStatsPut['_id'].split('/')[0], testSimilPut['_id'].split('/')[0] ])
+cleanupTests([ d['_id'].split('/')[0] for d in [testStatsPut, testSimilPut] ])

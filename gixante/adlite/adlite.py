@@ -1,53 +1,33 @@
+import sys
 from flask import Flask, request, url_for, render_template
-from requests import put, get
+from gixante.utils.api import get, put, cfg, log, checkHeartbeat
 
-from gixante.utils.parsing import log
+runDebug = sys.argv[-1].lower() == 'debug'
 
-apiRoot = 'http://80.192.114.42:5000'
-def APIstatus():
-    try:
-        msg = get(apiRoot + '/getCollStats').reason
-    except:
-        msg = "Not up!"
-    log.debug("API on {0} says: {1}".format(apiRoot, msg))
-    return(msg=="OK")
-
-# TODO: ideally, this function should live on another utils package
-def rw(fun, url, params=None, kwargs=None):
-    try:
-        req = fun(url, params, **kwargs)
-        if req.status_code == 200:
-            log.debug("API status on {0} is {1} with message: {2}".format(url, req.status_code, req.message))
-            out = req.json()
-        else:
-            log.error("API status on {0} is {1} with message: {2}".format(url, req.status_code, req.message))
-            out = {'APIerror': req.message}
-    except:
-        log.error("Cannot connect to API on {0}".format(url))
-        out = {'APIerror': "The content API does not seem to be up"}
-
-testStat = rw(get, apiRoot + '/getCollStats')
-
-### test the API
-
-# testStat = get(apiRoot + '/getCollStats').json()
-# testStatAdd = put(apiRoot + '/addSiteStat/site=adlite', data={'dummyField': 'dummyValue'}).json()
-# testPut = put(apiRoot + '/put/csvWords=this,is,a,dummy,test').json()
-# testGet = get(apiRoot + '/get/id={0}/fields=text,queryInProgress,nDocs,_key/minNumDocs={1}/nMoreDocs={2}/docFields=URL,title'.format(testPut['_key'], 10, 25)).json()
-# testGetFast = get(apiRoot + '/get/id={0}/fields=queryInProgress,text'.format(testPut['_key'])).json()
-# testSema = get(apiRoot + '/semantic/id={0}/nEachSide={1}/minNumDocs={2}/rankPctDocs={3}'.format(testPut['_key'], 10, 25, 0.5), data={'semaSearch': 'cool'}).json()
-# queryId = testPut['_key']
-###
-
-app = Flask(__name__)
-app.config.from_object(__name__)
-
-app.jinja_env.globals.update(APIstatus=APIstatus)
+if runDebug:
+    apiRoot = 'http://localhost:5000'
+    log.setLevel(0)
+else:
+    apiRoot = 'http://{0}:{1}'.format(cfg[ 'newsApiIP' ], cfg[ 'newsApiPort' ])
 
 nGet = 1000
 nReturnDocs = 25
 nSemantic = 10
 
+app = Flask(__name__)
+app.config.from_object(__name__)
+
+def hbCheck():
+    try:
+        checkHeartbeat(apiRoot + '/heartbeat')
+        return('OK')
+    except Exception as hbe:
+        log.debug(sys.exc_info().__str__())
+        return(hbe.__str__())
+
+app.jinja_env.globals.update(APIstatus=hbCheck)
+
+# ROUTING - BASIC PAGES
 @app.route('/')
 @app.route('/index')
 def index():
@@ -63,8 +43,11 @@ def advertisers():
 
 @app.route('/about')
 def about():
-    nDocs = get(apiRoot + '/getCollStats').json()['alive']['count']
-    millDocs = "{:,}".format((nDocs - nDocs % 1e5) / 1e6)
+    out = get(apiRoot + '/getCollStats')
+    if 'alive' in out:
+        millDocs = "more than {:,} million".format((out['alive']['count'] - out['alive']['count'] % 1e5) / 1e6)
+    else:
+        millDocs = 'millions of'
     return render_template('about.html', millDocs=millDocs)
     
 @app.route('/why')
@@ -72,53 +55,79 @@ def why():
     return render_template('why.html')
 
 @app.route('/contact')
-def contact():
-    return(render_template('contact.html'))
+@app.route('/contact/<message>')
+def contact(message=''):
+    return(render_template('contact.html', message=message))
 
 @app.route('/add_contact', methods=['POST', 'GET'])
 def add_contact():
-    res = put(apiRoot + '/addSiteStat/site=adlite', data=request.form).json()
+    data = dict(request.form)
+    if runDebug: data.update({'_flag': 'test'})
+    res = put(apiRoot + '/addSiteStat/site=adlite', data=data)
     return(render_template('thankyou.html'))
 
-# AD DEMO
+# ROUTING - AD DEMO
 @app.route('/ad_demo')
-def ad_demo(error=None):
-    nDocs = "{:,}".format(get(apiRoot + '/getCollStats').json()['alive']['count'])
-    return render_template('ad_demo.html', nDocs=nDocs, error=error)
+def ad_demo(NUerror=None):
+    out = get(apiRoot + '/getCollStats')
+    out['NUerror'] = NUerror
+    if 'alive' in out: out['nDocs'] = "{:,}".format(out['alive']['count'])
+    return render_template('ad_demo.html', **out)
 
 @app.route('/ad_initial', methods=['POST', 'GET'])
 def ad_initial():
-    res = put(apiRoot + '/post', data={'text': request.form['paragraph']}).json()
-    if 'error' in res:
-        return(ad_demo(error=res['error']))
+    data = data={'text': request.form['paragraph']}
+    if runDebug: data.update({'_flag': 'test'})
+    res = put(apiRoot + '/post', data=data)
+    if 'NUerror' in res:
+        return(ad_demo(NUerror=res['NUerror']))
     else:
         return(ad_fetch(res['_key']))
 
 @app.route('/ad_fetch/<queryId>')
 @app.route('/ad_fetch/<queryId>/<int:nMoreDocs>')
 def ad_fetch(queryId, nMoreDocs=nGet):
-    out = get(apiRoot + '/get/id={0}/fields=text,queryInProgress,nDocs,_key/minNumDocs={1}/nMoreDocs={2}/docFields=URL,title'.format(queryId, nReturnDocs, nMoreDocs)).json()
-    out['docs'] = out['docs'][:nReturnDocs]
-    print(out['nDocs'])
+    out = get(apiRoot + '/get/id={0}/fields=text,queryInProgress,nDocs,_key/minNumDocs={1}/nMoreDocs={2}/docFields=URL,title'.format(queryId, nReturnDocs, nMoreDocs))
+    if 'docs' in out: out['docs'] = out['docs'][:nReturnDocs]
     return(render_template('ad_results.html', **out))
     
 @app.route('/ad_semantic_intro/<queryId>', methods=['POST', 'GET'])
 def ad_semantic_intro(queryId):
-    out = get(apiRoot + '/get/id={0}/fields=text,_key,nDocs'.format(queryId)).json()
+    out = get(apiRoot + '/get/id={0}/fields=text,_key,nDocs'.format(queryId))
     return(render_template('ad_semantic_intro.html', **out))
     
 @app.route('/ad_semantic/<queryId>', methods=['POST', 'GET'])
 def ad_semantic(queryId):
     # rank some docs semantically
-    out = get(apiRoot + '/semantic/id={0}/nEachSide={1}/minNumDocs={2}/rankPctDocs={3}'.format(queryId, nSemantic, nGet, 0.5), data=request.form).json()
+    out = get(apiRoot + '/semantic/id={0}/nEachSide={1}/minNumDocs={2}/rankPctDocs={3}'.format(queryId, nSemantic, nGet, 0.5), data=request.form)
     # add some info
-    out.update(get(apiRoot + '/get/id={0}/fields=queryInProgress,text,_key,nDocs'.format(queryId)).json())
+    out.update(get(apiRoot + '/get/id={0}/fields=queryInProgress,text,_key,nDocs'.format(queryId)))
     out.update(request.form)
     return(render_template('ad_semantic.html', **out))
 
+@app.route('/api_error/<int:code>', methods=['POST', 'GET'])
+@app.route('/api_error/<int:code>/<message>', methods=['POST', 'GET'])
+def api_error(code, message=None):
+    log.error("API error {0} encountered on a live page: {1}".format(code, message))
     
+    data = {'message': message, 'code': code}
+    if runDebug:
+        data.update({'_flag': 'test'})
+    else:
+        data.update({'_flag': 'liveError'})
     
+    res = put(apiRoot + '/addSiteStat/site=adlite', data=data)
+    return(render_template('api_error.html'))
+
+###
     
+log.info("Ready for business!")
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=(5000 + runDebug), debug=runDebug)
+    
+log.info("Goodbye!") 
+
     
     
     

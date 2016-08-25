@@ -1,0 +1,16 @@
+{% extends "layout.html" %}
+
+{% block head %}
+<title>Adlite | API error</title>
+<link href="{{ url_for('static', filename='navbar.css') }}" rel="stylesheet">
+{% endblock %}
+
+{% block body %}
+<div class="jumbotron">
+  <h1>Blast!</h1>
+  <p>There seems to be a problem connecting to our data at the moment - sorry about that. Leave us a message and you will be notified when everything is back to normal!</p>
+</div>
+<hr class="featurette-divider">
+<meta http-equiv="refresh" content="5;url={{ url_for('contact', message='There was a problem with the online demo - please let me know when it is back to normal')}}" />
+{% endblock %}
+      

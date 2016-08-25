@@ -4,6 +4,12 @@
 {% block head %}
 <title>Adlite | Demo for advertisers</title>
 <link href="{{ url_for('static', filename='navbar.css') }}" rel="stylesheet">
+
+{% if APIerror or not APIok %}
+<p>{{ APIerror }}</p>
+	<meta http-equiv="refresh" content="3;url={{ url_for('api_error', message=APIerror, code=APIcode)}}" />
+{% endif %}
+
 {% endblock %}
 
 {% block body %}
@@ -15,7 +21,7 @@
 		<p class="text-muted">To get started, enter some text in the box below and we will search {{ nDocs }} news articles to find the most relevant ones. You can copy an entire piece of content or type directly.</p>
 		<p class="text-muted">These results are natural candidates to promote your branded content; but we'll show you how to use our free text filters to really fine tune the results.</p>
 		
-		{% if error %}
+		{% if NUerror %}
 			<code>Cannot understand your text...try with a longer paragraph. Please note that this demo is for English only and case sensitive.</code>
 		{% endif %}
 

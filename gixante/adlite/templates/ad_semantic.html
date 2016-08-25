@@ -4,6 +4,11 @@
 {% block head %}
 <title>Adlite | Demo for advertisers</title>
 <link href="{{ url_for('static', filename='navbar.css') }}" rel="stylesheet">
+
+{% if APIerror or not APIok %}
+	<meta http-equiv="refresh" content="0;url={{ url_for('api_error', message=APImessage, code=APIcode)}}" />
+{% endif %}
+
 {% endblock %}
 
 {% block body %}
@@ -13,7 +18,7 @@
 <div class="jumbotron">
   <div class="container">
 	<h1 class="display-3">Semantic Filters</h1>
-	{% if not error %}
+	{% if not NUerror %}
 		<p class="text-muted">We analysed {{ nDocs}} linked to your content:</p>
 		<blockquote >"{{ text }}"</blockquote>
 		<p class="text-muted">and ranked them by the meaning of:</p>
@@ -47,7 +52,7 @@
 	</div>
 {% endif %}
 
-{% if error %}
+{% if NUerror %}
 	<p><code>Cannot understand your search! Please note that this demo is for English only and case sensitive.</code></p>
 {% endif %}
 
