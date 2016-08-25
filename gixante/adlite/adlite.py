@@ -1,16 +1,35 @@
 from flask import Flask, request, url_for, render_template
 from requests import put, get
 
+from gixante.utils.parsing import log
+
 apiRoot = 'http://80.192.114.42:5000'
 def APIstatus():
     try:
-        return(get(apiRoot + '/getCollStats').reason)
+        msg = get(apiRoot + '/getCollStats').reason
     except:
-        return("Not up!")
+        msg = "Not up!"
+    log.debug("API on {0} says: {1}".format(apiRoot, msg))
+    return(msg=="OK")
+
+# TODO: ideally, this function should live on another utils package
+def rw(fun, url, params=None, kwargs=None):
+    try:
+        req = fun(url, params, **kwargs)
+        if req.status_code == 200:
+            log.debug("API status on {0} is {1} with message: {2}".format(url, req.status_code, req.message))
+            out = req.json()
+        else:
+            log.error("API status on {0} is {1} with message: {2}".format(url, req.status_code, req.message))
+            out = {'APIerror': req.message}
+    except:
+        log.error("Cannot connect to API on {0}".format(url))
+        out = {'APIerror': "The content API does not seem to be up"}
+
+testStat = rw(get, apiRoot + '/getCollStats')
 
 ### test the API
 
-print("API on {0} says: {1}".format(apiRoot, APIstatus()))
 # testStat = get(apiRoot + '/getCollStats').json()
 # testStatAdd = put(apiRoot + '/addSiteStat/site=adlite', data={'dummyField': 'dummyValue'}).json()
 # testPut = put(apiRoot + '/put/csvWords=this,is,a,dummy,test').json()

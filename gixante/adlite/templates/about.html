@@ -11,7 +11,7 @@
   <div class="jumbotron">
 	<h1>See how it works</h1>
 	<p>Are you a publisher? Keep writing great content. Are you an advertiser? Keep writing great content. We do the rest. We have just created a new channel that unlocks new revenue opportunities for publishers and advertisers. Keep writing great content that people can really engage with.</p>
-	{% if APIstatus() == "OK" %}
+	{% if APIok %}
 		<div style="float: left; padding: 5px;"><p><a class="btn btn-primary btn-lg" href="{{ url_for('ad_demo') }}" role="button">Try the online demo now</a></p></div>
 	{% endif %}
 	<div style="float: left; padding: 5px;"><p><a class="btn btn-primary btn-lg" href="{{ url_for('contact') }}"  role="button">Request a full demo &raquo;</a></p></div>
@@ -23,7 +23,7 @@
   <div class="row featurette">
 	<div class="col-md-7">
 	  <h2 class="featurette-heading"><span class="text-muted">1.</span>We profile content from premium publishers. 24/7.</h2>
-	  <p class="lead">We have profiled more than {{ millDocs }} million pages from premium publishers and counting. Politics, sport, culture, business, lifestyle, fashion, environment, tech, travel, and many more. </p>
+	  <p class="lead">We have profiled more than {% if APIok %}{{ millDocs }}{% endif%} million pages from premium publishers and counting. Politics, sport, culture, business, lifestyle, fashion, environment, tech, travel, and many more. </p>
 	</div>
 	<div class="col-md-5">
 	</div>

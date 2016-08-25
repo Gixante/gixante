@@ -1,5 +1,7 @@
-# this file contains all shared functions
-# keep it light! (don't load big files)
+"""
+This module contains all functions used to parse, split etc. (and some config for now)
+Keep it light! (don't load big files)
+"""
 
 import logging, os, re, sys
 from datetime import datetime as dt

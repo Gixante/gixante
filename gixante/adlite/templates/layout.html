@@ -1,4 +1,5 @@
-{% if APIstatus() == "OK" %}
+{% set APIok = APIstatus() == "OK" -%}
+{% if APIok %}
 	{% set navigation_bar = [
 		('about', 'About'),
 		('publishers', 'Publishers'),
@@ -26,11 +27,11 @@
 	
 	<meta name="description" content="">
     <meta name="author" content="Gixante LTD">
-    <link rel="icon" href="../../favicon.ico">
+    <link rel="icon" href="{{ url_for('static', filename='adlite_favicon.png') }}">
 
     <!-- Bootstrap core CSS -->
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
-
+    
 	{% block head %}
 	{% endblock %}
 

@@ -1,5 +1,5 @@
 
-import time, pickle, os, threading, re, sys
+import time, pickle, os, threading, sys, re
 from flask import Flask, request
 from flask_restful import Resource, Api
 import numpy as np
@@ -15,20 +15,37 @@ weights, voc, coordModel = pickle.load(open(os.path.join(cfg['dataDir'], 'forMan
 opposites = [ tuple(l.strip().split(',')) for l in open(os.path.join(cfg['dataDir'], 'opposites.csv'), 'r') ]
 shifts = np.vstack([ weights[ voc[opp[1]] ] - weights[ voc[opp[0]] ] for opp in opposites ])
 vocInv = dict([ (k, w) for w, k in voc.items() ])
-
 pivotVecs, pivotIds, _ = getPivots(docCollName)
 
 Qend = " {{'URL': doc.URL, 'sentences': slice(doc.sentences, 0, 10), 'title': doc.title}}"
 closestQ = "FOR doc IN %s FILTER doc.partition == {0} FILTER doc.contentLength > 500 FILTER doc.title != NULL RETURN" % docCollName + Qend
-urlQ = "FOR doc in %s FILTER doc.URL IN {0} RETURN" % docCollName + Qend
-log.info("Ready for business!") 
+urlQ = "FOR doc in %s FILTER doc.URL IN {0} RETURN" % docCollName + Qend 
 
-# General functions
+# helper functions
+def lazyMatch(queryId, queryData, nDocs):
+    apiColl.update_document(queryId, {'queryInProgress': True}) # bit overkill
+    queryData['queryInProgress'] = True
+    while len(queryData['docs']) < nDocs:
+        q = closestQ.format(queryData['sortedPids'][ queryData['pidN'] ])
+        newDocs, newVecs = scoreBatch(list(database.execute_query(q)), voc, weights, scoreType='mean')
+        if len(newDocs):
+            newDocSimil = newVecs.dot(np.array(queryData['vec']))
+            currentSimil = [ doc['similarity'] for doc in queryData['docs'] ]
+            nonDupes = np.where(~np.in1d(np.round(newDocSimil, 10), np.round(currentSimil, 10)))[0]
+            for ix in nonDupes: queryData['docs'].append({'similarity': newDocSimil[ix], 'title': newDocs[ix]['title'], 'URL': newDocs[ix]['URL']})
+            queryData['docs'] = sorted(queryData['docs'], key=lambda d: d['similarity'], reverse=True)
+            queryData['nDocs'] = len(queryData['docs'])
+        
+        queryData['pidN'] += 1
+        apiColl.update_document(queryId, queryData)
+    
+    apiColl.update_document(queryId, {'queryInProgress': False})
+
 def keepPivotsUpdated(docCollName):
     global pivotIds, pivotVecs
     while True:
+        pivotVecs, pivotIds, _ = getPivots(docCollName)
         time.sleep(300)
-        pivotVecs, pivotIds, _ = getPivots(docCollName, pivotIds, pivotVecs)
 
 def unitVec(vec): return(vec / np.linalg.norm(vec))
 
@@ -82,25 +99,7 @@ def contextRank(sentence, contextVec):
     else:
         return(([], [], [], []))
 
-def lazyMatch(queryId, queryData, nDocs):
-    apiColl.update_document(queryId, {'queryInProgress': True}) # bit overkill
-    queryData['queryInProgress'] = True
-    while len(queryData['docs']) < nDocs:
-        q = closestQ.format(queryData['sortedPids'][ queryData['pidN'] ])
-        newDocs, newVecs = scoreBatch(list(database.execute_query(q)), voc, weights, scoreType='mean')
-        if len(newDocs):
-            newDocSimil = newVecs.dot(np.array(queryData['vec']))
-            currentSimil = [ doc['similarity'] for doc in queryData['docs'] ]
-            nonDupes = np.where(~np.in1d(np.round(newDocSimil, 10), np.round(currentSimil, 10)))[0]
-            for ix in nonDupes: queryData['docs'].append({'similarity': newDocSimil[ix], 'title': newDocs[ix]['title'], 'URL': newDocs[ix]['URL']})
-            queryData['docs'] = sorted(queryData['docs'], key=lambda d: d['similarity'], reverse=True)
-            queryData['nDocs'] = len(queryData['docs'])
-        
-        queryData['pidN'] += 1
-        apiColl.update_document(queryId, queryData)
-    
-    apiColl.update_document(queryId, {'queryInProgress': False})
-
+# API classes
 class Statistics(Resource):
     def put(self, site):
         return(database.col(site + 'Stats').create_document(request.form))
@@ -211,6 +210,8 @@ api.add_resource(Semantic,
     '/semantic/id=<string:queryId>/nEachSide=<int:nEachSide>', # POST
     )
 
+log.info("Ready for business!")
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=(sys.argv[-1]=='debug'))
     
@@ -220,7 +221,7 @@ log.info("Goodbye!")
 """
 from requests import put, get
 
-test0 = get('http://localhost:5000/stats').json()
+test0 = get('http://localhost:5000/getCollStats').json()
 
 test1 = put('http://localhost:5000/post', data={'text': 'this is a simple test'}).json()
 test2 = put('http://localhost:5000/put/csvWords=this,is,a,simple,test').json()

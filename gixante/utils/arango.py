@@ -173,19 +173,13 @@ def createPivot(doc, vec, pivotColl, partitionId, nDocs):
     pivotColl.create_document(pivot)
     log.debug("Created a new pivot: partition={0}, nDocs: {1}".format(partitionId, nDocs))
 
-def getPivots(collectionName, existPids=None, existVecs=None):
+def getPivots(collectionName, cacheFile='/tmp/pivots.pkl'):
     
     pivCollName = collectionName + 'Pivots'
     
-    if existPids is None or existVecs is None:
-        log.info("Getting pivots from %s - from scratch" % pivCollName)
-        allPivotQ = "FOR piv in %s RETURN {'embedding': piv.embedding, 'partition': piv.partition, 'nDocs': piv.nDocs}" % pivCollName
-        pivotDocs = list(database.execute_query(allPivotQ))
-        pivotVecs = np.vstack([ p['embedding'] for p in pivotDocs ]).astype(np.float32)
-        pivotIds = np.array([ p['partition'] for p in pivotDocs ])
-        counts = [ p['nDocs'] for p in pivotDocs ]
-    else:
+    if os.path.exists(cacheFile):
         log.info("Getting pivots from %s - the fast way" % pivCollName)
+        existPids, existVecs, _ = pickle.load(open('/tmp/pivots.pkl', 'rb'))
         allPivotQ = "FOR piv in %s RETURN {'partition': piv.partition, 'nDocs': piv.nDocs}" % pivCollName
         embedQ = "FOR piv in %s FILTER piv.partition == {0} RETURN piv.embedding" % pivCollName
         pidCounts = list(database.execute_query(allPivotQ))
@@ -203,8 +197,16 @@ def getPivots(collectionName, existPids=None, existVecs=None):
         pivotVecs = np.vstack(next(tmp)).astype(np.float32)
         pivotIds = np.array(next(tmp))
         counts = np.array(next(tmp))
+    else:
+        log.info("Getting pivots from %s - from scratch" % pivCollName)
+        allPivotQ = "FOR piv in %s RETURN {'embedding': piv.embedding, 'partition': piv.partition, 'nDocs': piv.nDocs}" % pivCollName
+        pivotDocs = list(database.execute_query(allPivotQ))
+        pivotVecs = np.vstack([ p['embedding'] for p in pivotDocs ]).astype(np.float32)
+        pivotIds = np.array([ p['partition'] for p in pivotDocs ])
+        counts = [ p['nDocs'] for p in pivotDocs ]
     
     pivotCounts = dict(zip(pivotIds, counts))
+    pickle.dump((pivotIds, pivotVecs, pivotCounts), open('/tmp/pivots.pkl', 'wb'))
     return(pivotVecs, pivotIds, pivotCounts)
 
 def checkPivotCount(collectionName, nRand=100):     
