@@ -9,6 +9,7 @@ from pandas import DataFrame, concat
 from numpy import array, where
 from enum import Enum
 from collections import OrderedDict
+from gensim import utils
 
 # CONFIG
 removeAfter = ['^#', '\?', '\=']
