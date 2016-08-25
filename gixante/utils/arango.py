@@ -139,6 +139,11 @@ def count(collectionName, fast=True):
         q = "FOR doc in %s COLLECT WITH COUNT INTO c RETURN c"
         return(next(database.execute_query(q % collectionName)))
 
+def cleanupTests(collectionNames):
+    cleanupQ = "FOR doc IN {0} FILTER doc._flag == 'test' REMOVE doc IN {0}"
+    res = [ list(database.execute_query(cleanupQ.format(cName))) for cName in collectionNames ]
+    return(dict(zip(collectionNames, res)))
+
 def getCollection(collectionName, withPivots=True):
     
     if collectionName not in database.collections['user']:

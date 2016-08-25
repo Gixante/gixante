@@ -150,7 +150,7 @@ class SimilToText(Resource):
                 time.sleep(1)
                 queryData = apiColl.get_first_example({'_key': queryId})
             
-            out = dict([ (f, queryData[f]) for f in fields ])
+            out = dict([ (f, queryData[f]) for f in fields if f in queryData ])
             out['docs'] = [ dict([ (f, doc[f]) for f in docFields ]) for doc in queryData['docs'][:totNumDocs] ]
             return(out)
         else:
@@ -168,8 +168,9 @@ class Semantic(Resource):
         
         # fetch at least nEachSide*2 docs for now, but request minNumDocs in the background
         nDocsSoFar = next(database.execute_query("FOR doc IN {0} FILTER doc._key == '{1}' RETURN doc.nDocs".format(apiColl.name, queryId)))
-        similDocs = SimilToText().get(queryId, 'nDocs,vec', nEachSide*2, minNumDocs - nDocsSoFar,  'URL')
-                
+        similDocs = SimilToText().get(queryId, 'nDocs,vec,semaSearch', nEachSide*2, minNumDocs - nDocsSoFar,  'URL')
+        apiColl.update_document(queryId, {'semaSearch': similDocs.get('semaSearch', []) + [semaSearch]})
+        
         docs = list(database.execute_query(urlQ.format([ doc['URL'] for doc in similDocs['docs'][:int(rankPctDocs*max(minNumDocs, similDocs['nDocs']))] ])))
         docs, vecs = scoreBatch(docs, voc, weights)
         posVec, negVec, posContext, negContext = contextRank(semaSearch, np.array(similDocs['vec']))
@@ -189,14 +190,13 @@ class Semantic(Resource):
 
 ###
 
-
 app = Flask(__name__)
 api = Api(app)
 
 pivotUpdater = threading.Thread(target=keepPivotsUpdated, args=[docCollName], name='pivotUpdater', daemon=True)
 pivotUpdater.start()
 
-api.add_resource(Statistics, '/getCollStats', '/addSiteStat/site=<string:site>')
+api.add_resource(Statistics, '/heartbeat', '/getCollStats', '/addSiteStat/site=<string:site>')
 api.add_resource(SimilToText, 
     '/get/id=<string:queryId>/fields=<string:fields>/minNumDocs=<int:minNumDocs>/nMoreDocs=<int:nMoreDocs>/docFields=<string:docFields>', 
     '/get/id=<string:queryId>/fields=<string:fields>',
@@ -216,22 +216,5 @@ if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=(sys.argv[-1]=='debug'))
     
 log.info("Goodbye!") 
-    
-### tests
-"""
-from requests import put, get
-
-test0 = get('http://localhost:5000/getCollStats').json()
-
-test1 = put('http://localhost:5000/post', data={'text': 'this is a simple test'}).json()
-test2 = put('http://localhost:5000/put/csvWords=this,is,a,simple,test').json()
-test3 = get('http://localhost:5000/get/id={0}/fields=queryInProgress,nDocs/minNumDocs=25/nMoreDocs=1000/docFields=URL'.format(test2['_key'])).json()
-test4 = get('http://localhost:5000/get/id={0}/fields=queryInProgress,nDocs'.format(test2['_key'])).json()
-
-test5 = get('http://localhost:5000/semantic/id={0}/nEachSide=10/minNumDocs=100/rankPctDocs=0.5/semaSearch=positive'.format(test2['_key'])).json()
-test6 = get('http://localhost:5000/semantic/id={0}/nEachSide=10/semaSearch=positive'.format(test2['_key'])).json()
-test7 = get('http://localhost:5000/semantic/id={0}/nEachSide=10/minNumDocs=100/rankPctDocs=0.5'.format(test2['_key']), data={'semaSearch': 'cool'}).json()
-test8 = get('http://localhost:5000/semantic/id={0}/nEachSide=10'.format(test2['_key']), data={'semaSearch': 'cool'}).json()
-"""
 
 

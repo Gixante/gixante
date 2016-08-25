@@ -3,7 +3,12 @@ This module contains functions used for the content API
 Keep it light! (don't load big files)
 """
 
-import sys, requests
+import sys, requests, json, os
+from gixante.utils.parsing import log
+
+# load config file
+print(os.path.join(*(['/'] + __file__.split('/')[:-1] + ['config.json'])))
+cfg = json.load(open(os.path.join(*(['/'] + __file__.split('/')[:-1] + ['config.json']))))
 
 def _requestWrap(reqType, url, data=None, **kwargs):
     """
