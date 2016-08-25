@@ -3,18 +3,44 @@ This module contains functions used for the content API
 Keep it light! (don't load big files)
 """
 
-import sys, requests, json, os
+import sys, requests, json, os, time, re
 from gixante.utils.parsing import log
 
 # load config file
-print(os.path.join(*(['/'] + __file__.split('/')[:-1] + ['config.json'])))
-cfg = json.load(open(os.path.join(*(['/'] + __file__.split('/')[:-1] + ['config.json']))))
+configFile = os.path.join(*(['/'] + __file__.split('/')[:-1] + ['config.json']))
+log.debug("Loading config from %s..." % configFile)
+cfg = json.load(open(configFile))
+
+###
+class HeartbeatError(Exception):
+    def __init__(self, url, lag):
+        self.url = url
+        self.lag = lag
+
+class HeartbeatDead(HeartbeatError):
+    def __init__(self, url): HeartbeatError.__init__(self, url, None)
+    
+    def __str__(self):
+        return("No heartbeat detected from '{0}'".format(self.url))
+        
+class HeartbeatUndetected(Exception):
+    def __init__(self, url): HeartbeatError.__init__(self, url, None)
+    
+    def __str__(self):
+        return("'{0}' looks alive but I cannot detect any heartbeat from it; perhaps no heartbeat was implemented in the API?".format(self.url))
+
+class HeartbeatSlow(HeartbeatError):
+    def __str__(self):
+        return("No heartbeat detected from '{0}' for {1:,} seconds".format(self.url, self.lag))
 
 def _requestWrap(reqType, url, data=None, **kwargs):
     """
     A wrapper to avoid crashes if the API is misbehaving
+    NOTE: a heartbeat GET is expected as a dictionary containing 'lastBeat' (epoch timestamp), 'period' (seconds), 'runtime' (seconds)
     """
     try:
+        checkHeartbeat(url)
+        
         if reqType == 'get':
             req = requests.get(url, data=data, **kwargs)
         elif reqType == 'put':
@@ -30,27 +56,38 @@ def _requestWrap(reqType, url, data=None, **kwargs):
         else:
             log.error(msg)
             out = {'APIerror': req.reason, 'APIcode': req.status_code}
+    except HeartbeatError as hbe:
+        log.error(hbe.__str__())
+        out = {'APIerror': "The API does not seem to be up (no heartbeat)", 'APIcode': 503}
     except requests.exceptions.ConnectionError as e:
         log.error("Cannot connect to API on {0}".format(url))
-        out = {'APIerror': "The API does not seem to be up", 'APIcode': 503}
+        out = {'APIerror': "The API does not seem to be up (no connection)", 'APIcode': 503}
     except:
         code = req.status_code if 'req' in locals() else 0
         out = {'APIerror': "Internal error: {0}".format(sys.exc_info().__str__()), 'APIcode': code}
     
     return(out)
+
+def checkHeartbeat(url, guessHeartBeatURL=True):
     
-def APIheartbeat():
-    hb = _requestWrap('get', apiRoot + '/heartbeat')
-    if hb['APIcode'] == 200:
-        return('OK')
-    elif hb['APIcode'] == 404:
-        return('API is up, but cannot check heartbeat') # perhaps it's not implemented?
+    if guessHeartBeatURL:
+        hbURL = ''.join(re.split('(/)', url)[:6] + ['heartbeat'])
     else:
-        return(hb['APIerror'])
-
-def get(url, data=None, **kwargs):
-    return _requestWrap('get', url, data=data, **kwargs)
-
-def put(url, data=None, **kwargs):
-    return(_requestWrap('put', url, data=data, **kwargs))
+        hbURL = url
     
+    try:
+        hbReq = requests.get(hbURL)
+    except:
+        log.debug(sys.exc_info().__str__())
+        raise HeartbeatDead(url)
+    
+    hbCode = hbReq.status_code
+    if hbCode == 200:
+        hb = hbReq.json()
+        lag = (time.time() - hb['lastBeat'])
+        if  lag > hb['period'] + hb['runtime']:
+            raise HeartbeatSlow(url, int(lag))
+        else:
+            log.debug("'{0}' was alive and kickin' {1} seconds ago".format(url, int(lag)))
+    else:
+        raise HeartbeatUndetected(url)

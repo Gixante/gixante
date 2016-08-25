@@ -8,6 +8,9 @@ from gixante.utils.arango import database, scoreBatch, cfg, getPivots, count
 from gixante.utils.parsing import classifierSplitter, log
 
 if len(sys.argv) < 2: sys.argv.append("news")
+runDebug = sys.argv[-1].lower() == 'debug'
+
+if runDebug: log.setLevel(0) # DEBUG is 10, but whatever
 
 docCollName = sys.argv[1]
 apiColl = database.col(docCollName + 'API')
@@ -16,6 +19,7 @@ opposites = [ tuple(l.strip().split(',')) for l in open(os.path.join(cfg['dataDi
 shifts = np.vstack([ weights[ voc[opp[1]] ] - weights[ voc[opp[0]] ] for opp in opposites ])
 vocInv = dict([ (k, w) for w, k in voc.items() ])
 pivotVecs, pivotIds, _ = getPivots(docCollName)
+heartbeat = {'lastBeat': time.time(), 'period': cfg[docCollName + 'ApiHeartbeatPeriod'], 'runtime': 25}
 
 Qend = " {{'URL': doc.URL, 'sentences': slice(doc.sentences, 0, 10), 'title': doc.title}}"
 closestQ = "FOR doc IN %s FILTER doc.partition == {0} FILTER doc.contentLength > 500 FILTER doc.title != NULL RETURN" % docCollName + Qend
@@ -41,11 +45,13 @@ def lazyMatch(queryId, queryData, nDocs):
     
     apiColl.update_document(queryId, {'queryInProgress': False})
 
-def keepPivotsUpdated(docCollName):
-    global pivotIds, pivotVecs
+def backgroundChecks(docCollName):
+    # updates pivots and heartbeat
+    global pivotIds, pivotVecs, heartbeat
     while True:
+        time.sleep(heartbeat['period'])
         pivotVecs, pivotIds, _ = getPivots(docCollName)
-        time.sleep(300)
+        heartbeat.update({'lastBeat': time.time()})
 
 def unitVec(vec): return(vec / np.linalg.norm(vec))
 
@@ -100,6 +106,10 @@ def contextRank(sentence, contextVec):
         return(([], [], [], []))
 
 # API classes
+class Heartbeat(Resource):
+    def put(self): pass
+    def get(self): return(heartbeat)
+
 class Statistics(Resource):
     def put(self, site):
         return(database.col(site + 'Stats').create_document(request.form))
@@ -193,10 +203,11 @@ class Semantic(Resource):
 app = Flask(__name__)
 api = Api(app)
 
-pivotUpdater = threading.Thread(target=keepPivotsUpdated, args=[docCollName], name='pivotUpdater', daemon=True)
-pivotUpdater.start()
+checker = threading.Thread(target=backgroundChecks, args=[docCollName], name='backgroundChecks', daemon=True)
+checker.start()
 
-api.add_resource(Statistics, '/heartbeat', '/getCollStats', '/addSiteStat/site=<string:site>')
+api.add_resource(Heartbeat, '/heartbeat')
+api.add_resource(Statistics, '/getCollStats', '/addSiteStat/site=<string:site>')
 api.add_resource(SimilToText, 
     '/get/id=<string:queryId>/fields=<string:fields>/minNumDocs=<int:minNumDocs>/nMoreDocs=<int:nMoreDocs>/docFields=<string:docFields>', 
     '/get/id=<string:queryId>/fields=<string:fields>',
@@ -213,7 +224,7 @@ api.add_resource(Semantic,
 log.info("Ready for business!")
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=(sys.argv[-1]=='debug'))
+    app.run(host='0.0.0.0', port=5000, debug=runDebug)
     
 log.info("Goodbye!") 
 
