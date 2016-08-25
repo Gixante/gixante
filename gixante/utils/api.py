@@ -33,41 +33,6 @@ class HeartbeatSlow(HeartbeatError):
     def __str__(self):
         return("No heartbeat detected from '{0}' for {1:,} seconds".format(self.url, self.lag))
 
-def _requestWrap(reqType, url, data=None, **kwargs):
-    """
-    A wrapper to avoid crashes if the API is misbehaving
-    NOTE: a heartbeat GET is expected as a dictionary containing 'lastBeat' (epoch timestamp), 'period' (seconds), 'runtime' (seconds)
-    """
-    try:
-        checkHeartbeat(url)
-        
-        if reqType == 'get':
-            req = requests.get(url, data=data, **kwargs)
-        elif reqType == 'put':
-            req = requests.put(url, data=data, **kwargs)
-        else:
-            raise NotImplementedError("reqType must be one of 'get' or 'put'")
-            
-        msg = "API status on {0} is {1} with message: {2}".format(url, req.status_code, req.reason)
-        if req.status_code == 200:
-            log.debug(msg)
-            out = req.json()
-            out.update({'APIcode': req.status_code})
-        else:
-            log.error(msg)
-            out = {'APIerror': req.reason, 'APIcode': req.status_code}
-    except HeartbeatError as hbe:
-        log.error(hbe.__str__())
-        out = {'APIerror': "The API does not seem to be up (no heartbeat)", 'APIcode': 503}
-    except requests.exceptions.ConnectionError as e:
-        log.error("Cannot connect to API on {0}".format(url))
-        out = {'APIerror': "The API does not seem to be up (no connection)", 'APIcode': 503}
-    except:
-        code = req.status_code if 'req' in locals() else 0
-        out = {'APIerror': "Internal error: {0}".format(sys.exc_info().__str__()), 'APIcode': code}
-    
-    return(out)
-
 def checkHeartbeat(url, guessHeartBeatURL=True):
     
     if guessHeartBeatURL:
@@ -91,3 +56,44 @@ def checkHeartbeat(url, guessHeartBeatURL=True):
             log.debug("'{0}' was alive and kickin' {1} seconds ago".format(url, int(lag)))
     else:
         raise HeartbeatUndetected(url)
+
+def _requestWrap(reqType, url, data=None, **kwargs):
+    """
+    A wrapper to avoid crashes if the API is misbehaving
+    NOTE: a heartbeat GET is expected as a dictionary containing 'lastBeat' (epoch timestamp), 'period' (seconds), 'runtime' (seconds)
+    """
+    try:
+        checkHeartbeat(url)
+        
+        if reqType == 'GET':
+            req = requests.get(url, data=data, **kwargs)
+        elif reqType == 'PUT':
+            req = requests.put(url, data=data, **kwargs)
+        else:
+            raise NotImplementedError("reqType must be one of 'GET' or 'PUT'")
+            
+        msg = "API status on {0} is {1} with message: {2}".format(url, req.status_code, req.reason)
+        if req.status_code == 200:
+            log.debug(msg)
+            out = req.json()
+            out.update({'APIcode': req.status_code})
+        else:
+            log.error(msg)
+            out = {'APIerror': req.reason, 'APIcode': req.status_code}
+    except HeartbeatError as hbe:
+        log.error(hbe.__str__())
+        out = {'APIerror': "The API does not seem to be up (no heartbeat)", 'APIcode': 503}
+    except requests.exceptions.ConnectionError as e:
+        log.error("Cannot connect to API on {0}".format(url))
+        out = {'APIerror': "The API does not seem to be up (no connection)", 'APIcode': 503}
+    except:
+        code = req.status_code if 'req' in locals() else 0
+        out = {'APIerror': "Internal error: {0}".format(sys.exc_info().__str__()), 'APIcode': code}
+    
+    return(out)
+
+def get(url, data=None, **kwargs):
+    return(_requestWrap('GET', url, data=data, **kwargs))
+
+def put(url, data=None, **kwargs):
+    return(_requestWrap('PUT', url, data=data, **kwargs))
