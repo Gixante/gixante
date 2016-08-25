@@ -1,8 +1,5 @@
 import sys
 
-sys.path.append('/home/bean/Code/gixante/gixante/utils')
-from api import get, put, cfg, log
-
 from gixante.utils.api import get, put, cfg, log
 from gixante.utils.arango import cleanupTests, database
 
