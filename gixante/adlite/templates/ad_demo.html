@@ -6,8 +6,7 @@
 <link href="{{ url_for('static', filename='navbar.css') }}" rel="stylesheet">
 
 {% if APIerror or not APIok %}
-<p>{{ APIerror }}</p>
-	<meta http-equiv="refresh" content="3;url={{ url_for('api_error', message=APIerror, code=APIcode)}}" />
+	<meta http-equiv="refresh" content="0;url={{ url_for('api_error', message=APIerror, code=APIcode)}}" />
 {% endif %}
 
 {% endblock %}

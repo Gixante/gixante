@@ -1,6 +1,6 @@
 import sys
 from flask import Flask, request, url_for, render_template
-from gixante.utils.api import get, put, cfg, log, checkHeartbeat
+from gixante.utils.api import get, put, cfg, log, checkHeartbeat, HeartbeatError
 
 runDebug = sys.argv[-1].lower() == 'debug'
 
@@ -21,9 +21,11 @@ def hbCheck():
     try:
         checkHeartbeat(apiRoot + '/heartbeat')
         return('OK')
-    except Exception as hbe:
-        log.debug(sys.exc_info().__str__())
+    except HeartbeatError as hbe:
         return(hbe.__str__())
+    except Exception as e:
+        log.debug(sys.exc_info().__str__())
+        return("An internal error has occurred")
 
 app.jinja_env.globals.update(APIstatus=hbCheck)
 

@@ -183,26 +183,33 @@ def getPivots(collectionName, cacheFile='/tmp/pivots.pkl'):
     pivCollName = collectionName + 'Pivots'
     
     if os.path.exists(cacheFile):
-        log.info("Getting pivots from %s - the fast way" % pivCollName)
-        existPids, existVecs, _ = pickle.load(open('/tmp/pivots.pkl', 'rb'))
-        allPivotQ = "FOR piv in %s RETURN {'partition': piv.partition, 'nDocs': piv.nDocs}" % pivCollName
-        embedQ = "FOR piv in %s FILTER piv.partition == {0} RETURN piv.embedding" % pivCollName
-        pidCounts = list(database.execute_query(allPivotQ))
-        
-        outList = []
-        for pc in tqdm(pidCounts):
-            if pc['partition'] in existPids:
-                ix = np.where(existPids == pc['partition'])[0][0]
-                outList.append( (existVecs[ix], pc['partition'], pc['nDocs']) )
-            else:
-                newVec = np.array(next(database.execute_query(embedQ.format(pc['partition']))))
-                outList.append( (newVec, pc['partition'], pc['nDocs']) )
-        
-        tmp = zip(*outList)
-        pivotVecs = np.vstack(next(tmp)).astype(np.float32)
-        pivotIds = np.array(next(tmp))
-        counts = np.array(next(tmp))
-    else:
+        try:
+            log.info("Getting pivots from %s - the fast way" % pivCollName)
+            existPids, existVecs, _ = pickle.load(open('/tmp/pivots.pkl', 'rb'))
+            allPivotQ = "FOR piv in %s RETURN {'partition': piv.partition, 'nDocs': piv.nDocs}" % pivCollName
+            embedQ = "FOR piv in %s FILTER piv.partition == {0} RETURN piv.embedding" % pivCollName
+            pidCounts = list(database.execute_query(allPivotQ))
+            
+            outList = []
+            for pc in tqdm(pidCounts):
+                if pc['partition'] in existPids:
+                    ix = np.where(existPids == pc['partition'])[0][0]
+                    outList.append( (existVecs[ix], pc['partition'], pc['nDocs']) )
+                else:
+                    newVec = np.array(next(database.execute_query(embedQ.format(pc['partition']))))
+                    outList.append( (newVec, pc['partition'], pc['nDocs']) )
+            
+            tmp = zip(*outList)
+            pivotVecs = np.vstack(next(tmp)).astype(np.float32)
+            pivotIds = np.array(next(tmp))
+            counts = np.array(next(tmp))
+            loadFromScratch = False
+        except Exception as e:
+            log.debug(sys.exc_info().__str__())
+            log.warning("Initialisation from cache failed - will reload from database")
+            loadFromScratch = True
+    
+    if LoadFromScratch:
         log.info("Getting pivots from %s - from scratch" % pivCollName)
         allPivotQ = "FOR piv in %s RETURN {'embedding': piv.embedding, 'partition': piv.partition, 'nDocs': piv.nDocs}" % pivCollName
         pivotDocs = list(database.execute_query(allPivotQ))
