@@ -1,6 +1,6 @@
 import sys, pickle, time
 
-from gixante.utils.arango import log, getCollection, assignBatchToPartitions, splitPartition, count, checkPivotCount
+from gixante.utils.arango import log, getCollection, assignBatchToPartitions, splitPartition, count, checkPivotCount, cfg
 
 # runtime args
 if len(sys.argv) < 2: sys.argv.append("news")
@@ -15,7 +15,7 @@ batchSize = int(sys.argv[3])
 #collection = getCollection(collectionName)
 
 # load data
-weights, voc, coordModel = pickle.load(open('/home/bean/catapi_data/forManager.pkl', 'rb'))
+weights, voc, coordModel = pickle.load(open(cfg['dataDir'] + '/forManager.pkl', 'rb'))
 
 ###
 

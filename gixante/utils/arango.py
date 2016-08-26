@@ -14,6 +14,7 @@ from datetime import datetime as dt # only used in PATCH
 
 from gixante.pyrango import Arango
 from gixante.utils.parsing import log, knownErrors, stripURL
+from gixante.utils.rabbit import publishLinks
 
 # load config file
 cfg = json.load(open(os.path.join(*(['/'] + __file__.split('/')[:-1] + ['config.json']))))
@@ -358,15 +359,30 @@ def getCleanDocs(shortQuery, voc, weights, collectionName):
     Outputs: docs and vecs
     """
     # build the query
-    retFields = set(['_key', 'URL', 'contentLength', 'partition', 'parserLog', 'sentences', 'errorCode' ])
+    retFields = set(['_key', 'URL', 'contentLength', 'parserLog', 'sentences', 'errorCode', 'createdTs', 'junk' ])
     ret = ", ".join([ "'{0}': doc.{0}".format(f) for f in retFields ])
     query = shortQuery + ' {%s}' % ret
     
     log.info("Carefully retrieving documents...")
     docList = list(database.execute_query(query))
     
-    #if len(docList) == 0:
-    #    return(docList, np.ndarray((0, weights.shape[1])))
+    if len(docList) == 0:
+        return(docList, np.ndarray((0, weights.shape[1])))
+    
+    # GATE: re-parse docs that have bad malformations
+    # TODO: use multiple fields in rabbit instead of nuking all these!
+    # "FOR doc IN news FILTER doc.partition == {0} FILTER doc.createdTs == NULL OR (doc.createdTs < 0 AND doc.createdTs > -37) RETURN doc"
+    # reParsee = []
+    # for doc in docList:
+    #     if not doc['createdTs'] or (doc['createdTs'] < 0 and doc['createdTs'] > -37): #it's a long story...
+    #         doc['errorCode'] == 'markedForReparsing'
+    #         reParsee.append(doc)
+    # 
+    # if len(reParsee):
+    #     publishLinks([ d['URL'] for d in reParsee ], routKeySuffix='') # publish straight to the collection queue
+    #     # remove errors from main collection and from Newbies
+    #     res = delDocs(errorDocs, collectionName)
+    #     res = delDocs(errorDocs, collectionName + 'Newbies') 
     
     # PATCH: add new fields here
     missingErrorCodesTs = []
@@ -382,7 +398,6 @@ def getCleanDocs(shortQuery, voc, weights, collectionName):
         log.debug("PATCH: {0} docs retrieved by '{1}' had 'errorCode' missing - parsed between {2} and {3}".format(missingErrorCodesN, shortQuery, tsFromTo[0], tsFromTo[1])) 
     else:
         log.debug("PATCH: {0} docs retrieved by '{1}' had 'errorCode' missing".format(missingErrorCodesN, shortQuery)) 
-        
     # PATCH END
     
     log.info("Flagging parsing errors and empties...")
@@ -392,9 +407,8 @@ def getCleanDocs(shortQuery, voc, weights, collectionName):
         
         elif doc['errorCode'] == 'empty' or doc['contentLength'] == 0 or sum([ len(s) for s in doc['sentences'] ]) == 0:
             doc['errorCode'] = 'empty'
-            #doc['contentLength'] = 0 don't use this no more in errors
     
-    #log.debug(([ doc['errorCode'] for doc in docList ]))
+    #log.debug(Counter([ doc['errorCode'] for doc in docList ]))
     
     # score 'em all
     docList2, vecs = scoreBatch([ doc for doc in docList if doc['errorCode'] == 'allGood' ], voc, weights)
@@ -419,25 +433,7 @@ def getCleanDocs(shortQuery, voc, weights, collectionName):
         docList3[ix.dupeIx]['dupliURL'] = docList3[ix.origIx]['URL']
     
     #log.debug(Counter([ doc['errorCode'] for doc in docList ]))
-    
-    # PATCH: check that dupes are actually dupes
-    log.debug("PATCH: double checking dupes...")
-    dupeDocs = [ doc for doc in docList if doc['errorCode'] == 'duplicated' ]
-    fields = ['source', 'ampLink', 'canonicalLink', 'title', 'createdTs', 'links', 'metas', 'body', 'sentences', 'contentLength']
-    useForSentences = 'body'
-    misDuped = []
-    for ix, doc in tqdm(list(enumerate(dupeDocs))):
-        _, vecDuo = scoreBatch([doc] + [d for d in docList if d['URL'] == doc['dupliURL']], voc, weights, verbose=False)
-        if np.linalg.norm(vecDuo[0] - vecDuo[1]) > 1e-8:
-            log.error("Looks like doc {0} is not really a dupe!".format(ix))
-            misDuped.append(ix)
-    if len(misDuped) > 0:
-        # dump data and crash
-        dumpFile = '/tmp/dump_{0}'.format(int(time.time()))
-        pickle.dump({'docList': docList, 'misDuped': misDuped}, open(dumpFile, 'wb'))
-        raise RuntimeError("Mis-dupes found  - dumped at {0}".format(dumpFile))
-    # PATCH END
-    
+        
     #errorDocs = [ {**doc, **{'skinnyURL': stripURL(doc['URL'])}} for doc in docList if doc['errorCode'] != 'allGood' ]
     errorDocs = []
     for doc in docList:
