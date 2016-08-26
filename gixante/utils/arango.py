@@ -14,7 +14,7 @@ from lxml import etree # only used if not using rabbit
 
 from gixante.pyrango import Arango
 from gixante.utils.parsing import log, knownErrors, stripURL, emptyField, cfg
-from gixante.utils.http import urlPoolMan # only used if not using rabbit
+from gixante.utils.http import addAll, urlPoolMan # only used if not using rabbit
 #from gixante.utils.rabbit import publishLinks one for the future
 
 # STARTUP
