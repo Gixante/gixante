@@ -3,7 +3,7 @@ This module contains all functions used to parse, split etc. (and some config fo
 Keep it light! (don't load big files)
 """
 
-import logging, os, re, sys
+import logging, os, re, sys, json
 from datetime import datetime as dt
 from pandas import DataFrame, concat
 from numpy import array, where
