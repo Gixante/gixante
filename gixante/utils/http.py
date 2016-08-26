@@ -177,7 +177,7 @@ def getCreatedTs(URL, tree=None, minTs=631152000): # ignore dates before 1990-01
     except:
         bodyAttempts = []
     
-    ts = [ a.timestamp() for a in urlAttempts + headAttempts + bodyAttempts ]
+    ts = [ a.timestamp() for a in headAttempts + bodyAttempts ]
     ts = [ t for t in ts if t >= minTs ]
     
     if len(ts):

@@ -54,7 +54,7 @@ while True:
             else:
                 # there are quite a bit of links left; only parse missing
                 docs = [ parser(url, skinny) for url, skinny in tqdm(missingFromAll(URLs, collectionName)) ]
-                        
+            
             # add errors to <collectionName>Errors
             errURLs = set([ err['URL'] for err in addErrors(docs, collectionName) ])
             

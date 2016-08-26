@@ -27,7 +27,6 @@ while True:
     # assign new docs to partitions
     if count(collectionName + 'Newbies') > batchSize:
         newCounts = assignBatchToPartitions(partitionQ.format(collectionName, batchSize), voc, weights, collectionName, coordModel)
-
         
         # now iterate over all the fat partitions
         log.info("Splitting large partitions...")
