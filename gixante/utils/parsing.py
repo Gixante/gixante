@@ -11,6 +11,11 @@ from enum import Enum
 from collections import OrderedDict
 from gensim import utils
 
+# define logger
+logging.basicConfig(format='%(asctime)s %(name)s %(levelname)-8s %(message)s')
+log = logging.getLogger("PID:%d" % os.getpid())
+log.setLevel(logging.DEBUG)
+
 # CONFIG
 # load config file
 configFile = os.path.join(*(['/'] + __file__.split('/')[:-1] + ['config.json']))
@@ -36,11 +41,6 @@ domain2coll = OrderedDict([
     ('bbcgoodfood.com/'       , 'otherBBCfood'),
     ('unknown'                , None),
     ])
-
-# define logger
-logging.basicConfig(format='%(asctime)s %(name)s %(levelname)-8s %(message)s')
-log = logging.getLogger("PID:%d" % os.getpid())
-log.setLevel(logging.DEBUG)
 
 # Errors
 knownErrors = {
