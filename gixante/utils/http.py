@@ -5,7 +5,7 @@ import sys, urllib3, certifi, re, time
 from collections import defaultdict, Counter
 from lxml import etree
 
-from gixante.utils.parsing import log, classifierSplitter, knownErrors, domain, recogniseDate, cleanText, months
+from gixante.utils.parsing import log, classifierSplitter, knownErrors, domain, recogniseDate, cleanText, months, emptyField
 
 # start a http pool manager and connect to ArangoDB
 log.info("Starting a HTTP connection...")

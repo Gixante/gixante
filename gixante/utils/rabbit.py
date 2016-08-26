@@ -39,5 +39,5 @@ def publishLinks(links, routKeySuffix='-links', linkMaxLegth=250):
     # publish to <collName>-links queue (directly)
     validLinksColls = [ (c, l) for c, l in zip(colls, links) if c ]
     log.info("Publishing {0} links...".format(len(validLinksColls)))
-    [ rabbitPublishChannel.basic_publish(exchange=urlXchgName, routing_key=c + appendToQ, body=l, properties=pika.BasicProperties(delivery_mode=2)) for c, l in validLinksColls ]
+    [ rabbitPublishChannel.basic_publish(exchange=urlXchgName, routing_key=c + routKeySuffix, body=l, properties=pika.BasicProperties(delivery_mode=2)) for c, l in validLinksColls ]
             

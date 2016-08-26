@@ -9,12 +9,12 @@ from scipy.sparse import csr_matrix
 from sklearn.cluster import KMeans
 from sklearn.manifold import TSNE
 from random import sample
-from collections import defaultdict#, Counter # Counter is only used for debug
+from collections import defaultdict, Counter # Counter is only used for debug
 from lxml import etree # only used if not using rabbit
 
 from gixante.pyrango import Arango
 from gixante.utils.parsing import log, knownErrors, stripURL, emptyField, cfg
-from gixante.utils.http import urlPoolMan
+from gixante.utils.http import urlPoolMan # only used if not using rabbit
 #from gixante.utils.rabbit import publishLinks one for the future
 
 # STARTUP
@@ -384,11 +384,10 @@ def getCleanDocs(shortQuery, voc, weights, collectionName):
                     doc, _ = addAll(doc, tree, stillMissing, useForSentences)
                 except:
                     doc['errorCode'] = 'cannotDownload'
-        #docList1.append(doc)
     
     log.debug("Found {0} docs with missing fields".format(nDocWithMiss))
        
-    #log.debug(Counter([ doc['errorCode'] for doc in docList ]))
+    log.debug(Counter([ doc['errorCode'] for doc in docList ]))
     
     # score 'em all
     docList2, vecs = scoreBatch([ doc for doc in docList if doc['errorCode'] == 'allGood' ], voc, weights)
@@ -412,7 +411,7 @@ def getCleanDocs(shortQuery, voc, weights, collectionName):
         docList3[ix.dupeIx]['errorCode'] = 'duplicated'
         docList3[ix.dupeIx]['dupliURL'] = docList3[ix.origIx]['URL']
     
-    #log.debug(Counter([ doc['errorCode'] for doc in docList ]))
+    log.debug(Counter([ doc['errorCode'] for doc in docList ]))
         
     #errorDocs = [ {**doc, **{'skinnyURL': stripURL(doc['URL'])}} for doc in docList if doc['errorCode'] != 'allGood' ]
     errorDocs = []
