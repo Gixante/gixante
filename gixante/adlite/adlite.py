@@ -121,14 +121,12 @@ def api_error(code, message=None):
     res = put(apiRoot + '/addSiteStat/site=adlite', data=data)
     return(render_template('api_error.html'))
 
-###
-    
 log.info("Ready for business!")
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=(5000 + runDebug), debug=runDebug)
-    
-log.info("Goodbye!") 
+#if __name__ == '__main__':
+#    app.run(host='0.0.0.0', port=(5000 + runDebug), debug=runDebug)
+#    
+#log.info("Goodbye!") 
 
     
     

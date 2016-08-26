@@ -16,7 +16,7 @@ forceReParse = False
 
 # configurations for different collections (TODO: put in a config file)
 f1 = ['source', 'ampLink', 'canonicalLink', 'title', 'createdTs', 'links', 'metas']
-f2 = ['sentences', 'contentLength']
+f2 = ['sentences', 'contentLength', 'errorCode']
 
 collArgs = {
     'news': {'fields': f1 + ['body'] + f2, 'useForSentences': 'body'},

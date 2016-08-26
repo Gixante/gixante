@@ -3,10 +3,8 @@
 
 import pika, sys, os, re, json
 
-from gixante.utils.parsing import log, domain2coll, domain
+from gixante.utils.parsing import log, domain2coll, domain, cfg
 
-# load config file
-cfg = json.load(open(os.path.join(*(['/'] + __file__.split('/')[:-1] + ['config.json']))))
 rabbitIP = cfg['rabbitIP']
 urlXchgName = cfg['urlXchgName']
 bufferBlock = cfg['bufferBlock']

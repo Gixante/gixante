@@ -12,6 +12,11 @@ from collections import OrderedDict
 from gensim import utils
 
 # CONFIG
+# load config file
+configFile = os.path.join(*(['/'] + __file__.split('/')[:-1] + ['config.json']))
+log.debug("Loading config from %s..." % configFile)
+cfg = json.load(open(configFile))
+
 removeAfter = ['^#', '\?', '\=']
 staticFeatures = ['leanPct', 'length', 'nDash', 'nTokens']
 
@@ -78,6 +83,10 @@ def domain(URL):
     for dom in domain2coll.keys():
         if dom in checkThis: break
     return(dom)
+
+def emptyField(doc, field, empties=[None, [], '', ['']]):
+    # a field can be none, missing, empty, whatever
+    return(field not in doc or doc[field] in empties)
 
 # try to match a date in a string
 months = array([ m for ml in zip(*[ dt.strftime(dt.strptime('%.2d' % (k+1), '%m'), '%b %B').lower().split() for k in range(12) ]) for m in ml ])

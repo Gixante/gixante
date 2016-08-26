@@ -13,26 +13,38 @@ urlPoolMan = urllib3.PoolManager(cert_reqs='CERT_REQUIRED', ca_certs=certifi.whe
 
 # FUNCTIONS
 # special parser 'configuration' function up here
-def configureAdd(doc, tree, field, useForSentences):
+def configureAdders(doc, tree=None, shouldHaveFields=[], useForSentences=None):
     # add functions and params here to make them visible to "add"
+    
+    _useForSentencesObj = doc[useForSentences] if useForSentences in doc else ''
+    
+    # start with functions that don't require the 'tree' of the document
     fields2Adders = {
-        'metas'              : [getMetas, {'tree': tree}],
-        'title'              : [getTitle, {'tree': tree}],
-        'createdTs'          : [getCreatedTs, {'tree': tree, 'URL': doc['URL']}],
-        'body'               : [getBody, {'tree': tree}],
-        'sentences'          : [getSentences, {'textObj': doc[useForSentences]}],
-        'contentLength'      : [getContentlength, {'sentences': doc['sentences']}],
-        'links'              : [getLinks, {'tree': tree, 'URL': doc['URL']}],
-        'domain'             : [getDomain, {'URL': doc['URL']}],
-        'source'             : [getSource, {'URL': doc['URL']}],
-        'ampLink'            : [getAmpLink, {'tree': tree}],
-        'canonicalLink'      : [getCanonicalLink, {'tree': tree}],
-        'ingredients'        : [getIngredients, {'tree': tree}],
-        'method'             : [getMethod, {'tree': tree}],
-        'ingredientDetails'  : [getIngredientDetails, {'tree': tree}],
+        'createdTs'          : [addCreatedTs, {'URL': doc['URL']}],
+        'sentences'          : [addSentences, {'textObj': _useForSentencesObj}],
+        'contentLength'      : [addContentLength, {'sentences': doc['sentences']}],
+        'domain'             : [addDomain, {'URL': doc['URL']}],
+        'source'             : [addSource, {'URL': doc['URL']}],
+        'errorCode'          : [addErrorCode, {'doc': doc, 'shouldHaveFields': shouldHaveFields}],
         }
     
-    return(fields2Adders[field])
+    if tree:
+        # now add the ones that require a tree (can re-implement the offline ones)
+        onlineFields2Adders = {
+            'metas'              : [getMetas, {'tree': tree}],
+            'title'              : [getTitle, {'tree': tree}],
+            'createdTs'          : [getCreatedTs, {'tree': tree, 'URL': doc['URL']}],
+            'body'               : [getBody, {'tree': tree}],
+            'links'              : [getLinks, {'tree': tree, 'URL': doc['URL']}],
+            'ampLink'            : [getAmpLink, {'tree': tree}],
+            'canonicalLink'      : [getCanonicalLink, {'tree': tree}],
+            'ingredients'        : [getIngredients, {'tree': tree}],
+            'method'             : [getMethod, {'tree': tree}],
+            'ingredientDetails'  : [getIngredientDetails, {'tree': tree}],
+            }
+        fields2Adders.update(onlineFields2Adders)
+    
+    return(fields2Adders)
 
 def parseHTML(URL, fields, useForSentences):
     
@@ -62,21 +74,53 @@ def parseHTML(URL, fields, useForSentences):
         return(out)
     
     # parser: add all the fields
-    out = addAll(out, tree, fields, useForSentences)
+    out, availFields = addAll(out, tree, fields, useForSentences)
     
-    # check for other errors
-    if len(out['sentences']) == 0 or out['contentLength'] == 0:
-        out['errorCode'] = 'empty'
-    elif out['domain'] == 'unknown':
-        out['errorCode'] = 'unknownDomain'
-        
+    # check if we're missing anything
+    notImplFields = set(fields).difference(availFields)
+    if len(notImplFields):
+        log.warning("Don't know how to parse {0}!".format(notImplFields))
+    
     return(out)
 
 # HELPERS TO parseHTML
 # these functions must return a defaultdict(list) or None
 # returning None will create a "field not found" WARNING in the parserLog 
+# naming convention: get-ers need an internet connection (a tree), add-ers don't. As a guide only
 def retWrapper(obj, name):
     return(defaultdict(list, {name: obj}))
+
+def addDomain(URL):
+    return(retWrapper(domain(URL), 'domain'))
+    
+def addSource(URL):
+    return(retWrapper(URL.split('/')[2], 'source'))
+
+def addErrorCode(doc, shouldHaveFields=[]):
+    e = 'allGood' if emptyField(doc, 'errorCode') else doc['errorCode']
+    if not e: e = 'allGood'
+    # use shouldHaveFields to avoid false positives
+    if 'parserLog' in shouldHaveFields and (emptyField(doc, 'parserLog') or any([ 'error' in p.lower() for p in doc['parserLog'] ])):
+        e = 'parsingError'
+    if 'contentLength' in shouldHaveFields and (emptyField(doc, 'contentLength') or doc['contentLength'] == 0):
+        e = 'empty'
+    if 'sentences' in shouldHaveFields and (emptyField(doc, 'sentences') or sum([ len(s) for s in doc['sentences'] ]) == 0):
+        e = 'empty'
+    if 'domain' in shouldHaveFields and (emptyField(doc, 'sentences') or doc['domain'] == 'unknown'):
+        e = 'unknownDomain'
+    return(retWrapper(e, 'errorCode'))
+
+def addSentences(textObj, splitter=classifierSplitter):
+    if type(textObj) is list:
+        out = [ s for s in splitter(' '.join(textObj)) ]
+    elif type(textObj) is dict:
+        out = [ s for s in splitter(' '.join(textObj.values())) ]
+    elif type(textObj) is str:
+        out = [ s for s in splitter(textObj) ]
+    return(retWrapper(out, 'sentences'))
+
+def addContentLength(sentences):
+    return(retWrapper(sum([ len(s) for s in sentences ]), 'contentLength'))
 
 def getMetas(tree):
     out = defaultdict(list)
@@ -91,8 +135,8 @@ def getMetas(tree):
 def getTitle(tree):
     return(retWrapper(fullText(tree.xpath('//title[1]')[0]), 'title'))
 
-def getCreatedTs(URL, tree=None, minTs=631152000): # ignore dates before 1990-01-01
-    # try extracting it from the URL first
+def addCreatedTs(URL):
+    # try extracting a timestamp from the URL
     try:
         dateTokens = [t for t in URL.split('/') if t in dateWords or re.match('^[0-9]{2,4}$', t)]
         urlAttempts = [ recogniseDate('/'.join(dateTokens)), recogniseDate(' '.join(dateTokens)) ]
@@ -100,8 +144,13 @@ def getCreatedTs(URL, tree=None, minTs=631152000): # ignore dates before 1990-01
     except:
         urlAttempts = []
     
-    # jump out if it's in the URL
-    if len(urlAttempts) > 0: return(retWrapper(min(urlAttempts).timestamp(), 'createdTs'))
+    if len(urlAttempts) > 0:
+        return(retWrapper(min(urlAttempts).timestamp(), 'createdTs'))
+
+def getCreatedTs(URL, tree=None, minTs=631152000): # ignore dates before 1990-01-01
+    # try extracting it from the URL first
+    fromURL = addCreatedTs(URL)
+    if fromURL: return(fromURL)
     
     # otherwise go up the tree if available(jump out at the first match)
     if tree:
@@ -139,30 +188,12 @@ def getBody(tree):
     out['body'] = cleanText(' '.join([ p[1] for p in fatPeas['peas'] ]))
     return(out)
 
-def getSentences(textObj, splitter=classifierSplitter):
-    if type(textObj) is list:
-        out = [ s for s in splitter(' '.join(textObj)) ]
-    elif type(textObj) is dict:
-        out = [ s for s in splitter(' '.join(textObj.values())) ]
-    elif type(textObj) is str:
-        out = [ s for s in splitter(textObj) ]
-    return(retWrapper(out, 'sentences'))
-        
-def getContentlength(sentences):
-    return(retWrapper(sum([ len(s) for s in sentences ]), 'contentLength'))
-
 def getLinks(tree, URL):
     dom = domain(URL)
     absoluteLinks = set(tree.xpath("//*[starts-with(normalize-space(@href),'http')]/@href | //*[starts-with(normalize-space(@href),'www')]/@href"))
     relativeLinks = tree.xpath("//*[not(starts-with(normalize-space(@href),'http'))]/@href")
     absoluteLinks.update([ dom + l for l in relativeLinks if l.startswith('/') and not l.startswith('www') ])
     return(retWrapper(list(absoluteLinks), 'links'))
-
-def getDomain(URL):
-    return(retWrapper(domain(URL), 'domain'))
-    
-def getSource(URL):
-    return(retWrapper(URL.split('/')[2], 'source'))
 
 def getAmpLink(tree):
     ampLink = tree.xpath("//link[@rel='amphtml']/@href")
@@ -173,7 +204,6 @@ def getCanonicalLink(tree):
     canoLink = tree.xpath("//link[@rel='canonical']/@href")
     if len(canoLink) > 0:# and urlPoolMan.request('HEAD', canoLink[0]).status == 200:
         return(retWrapper(canoLink[0], 'canonicalLink'))
-
 
 def getIngredients(tree):
     # compatible with with bbcgoodfood and bbc.co.uk/food
@@ -209,11 +239,17 @@ def getIngredientDetails(tree):
     return(retWrapper(dict(out), 'ingredientDetails'))
 
 def addAll(doc, tree, fields, useForSentences):
-    # NOTE: doc is expected to be a dict
+    # NOTE: doc is expected to be a dict containing 'parserLog' (a list) and 'URL' (a string)
+    assert 'parserLog' in doc and 'URL' in doc
+    
+    shouldHaveFields = list(doc.keys())
     
     for f in fields:
+        # adders mutates as new fields are added to doc!
+        adders = configureAdders(doc, tree, shouldHaveFields)
+        
         try:
-            addFun, addParams = configureAdd(doc, tree, f, useForSentences)
+            addFun, addParams = adders[f]
             addition = addFun(**addParams)
             if addition:
                 doc.update(addition)
@@ -221,10 +257,13 @@ def addAll(doc, tree, fields, useForSentences):
             else:
                 doc['parserLog'].append("WARNING adding '%s': no value found" % f)
         except:
+            log.debug(sys.exc_info().__str__())
             doc['parserLog'].append("ERROR adding '%s': " % f + sys.exc_info().__str__())
             doc['errorCode'] = 'parsingError'
+        
+        shouldHaveFields.append(f)
     
-    return(doc)
+    return(doc, adders.keys())
     
 # lxml utils
 def fullText(x):

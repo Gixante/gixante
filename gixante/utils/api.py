@@ -4,12 +4,7 @@ Keep it light! (don't load big files)
 """
 
 import sys, requests, json, os, time, re
-from gixante.utils.parsing import log
-
-# load config file
-configFile = os.path.join(*(['/'] + __file__.split('/')[:-1] + ['config.json']))
-log.debug("Loading config from %s..." % configFile)
-cfg = json.load(open(configFile))
+from gixante.utils.parsing import log, cfg
 
 ###
 class HeartbeatError(Exception):

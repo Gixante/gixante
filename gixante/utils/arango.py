@@ -10,19 +10,16 @@ from sklearn.cluster import KMeans
 from sklearn.manifold import TSNE
 from random import sample
 from collections import defaultdict#, Counter # Counter is only used for debug
-from datetime import datetime as dt # only used in PATCH
+from lxml import etree # only used if not using rabbit
 
 from gixante.pyrango import Arango
-from gixante.utils.parsing import log, knownErrors, stripURL
-from gixante.utils.rabbit import publishLinks
-
-# load config file
-cfg = json.load(open(os.path.join(*(['/'] + __file__.split('/')[:-1] + ['config.json']))))
-arangoIP = cfg['arangoIP']
+from gixante.utils.parsing import log, knownErrors, stripURL, emptyField, cfg
+from gixante.utils.http import urlPoolMan
+#from gixante.utils.rabbit import publishLinks one for the future
 
 # STARTUP
 log.info("Connecting to ArangoDB...")
-database = Arango(host=arangoIP, port=cfg['arangoPort'], password=cfg['arangoPwd']).db('catapi')
+database = Arango(host=cfg['arangoIP'], port=cfg['arangoPort'], password=cfg['arangoPwd']).db('catapi')
 
 # FUNCTIONS
 # Error handler
@@ -358,8 +355,8 @@ def getCleanDocs(shortQuery, voc, weights, collectionName):
     
     Outputs: docs and vecs
     """
-    # build the query
-    retFields = set(['_key', 'URL', 'contentLength', 'parserLog', 'sentences', 'errorCode', 'createdTs', 'junk' ])
+    # build the query (NOTE: order is important! Same as collArgs['fields'] in iterParse)
+    retFields = [ '_key', 'URL', 'domain', 'parserLog', 'createdTs', 'parsedTs', 'sentences', 'contentLength', 'errorCode' ]
     ret = ", ".join([ "'{0}': doc.{0}".format(f) for f in retFields ])
     query = shortQuery + ' {%s}' % ret
     
@@ -369,45 +366,28 @@ def getCleanDocs(shortQuery, voc, weights, collectionName):
     if len(docList) == 0:
         return(docList, np.ndarray((0, weights.shape[1])))
     
-    # GATE: re-parse docs that have bad malformations
-    # TODO: use multiple fields in rabbit instead of nuking all these!
-    # "FOR doc IN news FILTER doc.partition == {0} FILTER doc.createdTs == NULL OR (doc.createdTs < 0 AND doc.createdTs > -37) RETURN doc"
-    # reParsee = []
-    # for doc in docList:
-    #     if not doc['createdTs'] or (doc['createdTs'] < 0 and doc['createdTs'] > -37): #it's a long story...
-    #         doc['errorCode'] == 'markedForReparsing'
-    #         reParsee.append(doc)
-    # 
-    # if len(reParsee):
-    #     publishLinks([ d['URL'] for d in reParsee ], routKeySuffix='') # publish straight to the collection queue
-    #     # remove errors from main collection and from Newbies
-    #     res = delDocs(errorDocs, collectionName)
-    #     res = delDocs(errorDocs, collectionName + 'Newbies') 
+    # Integrity checks: add new fields in retFields and they will be lazily added (without re-downloading the doc) or ...
+    log.info("Checking for missing fields...")
+    nDocWithMiss = 0
+    # don't parse known errors again
+    for doc in tqdm([ d for d in docList if d['errorCode'] == 'allGood' or not d['errorCode'] ]):
+        missingFields = [ f for f in retFields if emptyField(doc, f) ]
+        if missingFields:
+            nDocWithMiss = nDocWithMiss =+ 1
+            doc, _ = addAll(doc, None, missingFields, useForSentences)
+            stillMissing = [ f for f in retFields if emptyField(doc, f) ]
+            if stillMissing:
+                print(stillMissing)
+                # TODO: instead, re-queue the docs with a 'forceUpdate' flag
+                try:
+                    tree = etree.ElementTree(etree.HTML(urlPoolMan.request('GET', URL).data))
+                    doc, _ = addAll(doc, tree, stillMissing, useForSentences)
+                except:
+                    doc['errorCode'] = 'cannotDownload'
+        #docList1.append(doc)
     
-    # PATCH: add new fields here
-    missingErrorCodesTs = []
-    missingErrorCodesN = 0
-    for doc in docList:
-        if 'errorCode' not in doc or doc['errorCode'] is None:
-            missingErrorCodesN += 1
-            if 'parsedTs' in doc: missingErrorCodesTs.append(doc['parsedTs'][-1])
-            doc['errorCode'] = 'allGood'
-    
-    if len(missingErrorCodesTs) > 0:
-        tsFromTo = [ dt.strftime(dt.fromtimestamp(ts), "%Y-%m-%d %H:%M") for ts in [min(missingErrorCodesTs), max(missingErrorCodesTs)] ]
-        log.debug("PATCH: {0} docs retrieved by '{1}' had 'errorCode' missing - parsed between {2} and {3}".format(missingErrorCodesN, shortQuery, tsFromTo[0], tsFromTo[1])) 
-    else:
-        log.debug("PATCH: {0} docs retrieved by '{1}' had 'errorCode' missing".format(missingErrorCodesN, shortQuery)) 
-    # PATCH END
-    
-    log.info("Flagging parsing errors and empties...")
-    for doc in docList:
-        if doc['errorCode'] == 'parsingError' or any([ 'error' in p.lower() for p in doc['parserLog'] ]):
-            doc['errorCode'] = 'parsingError'
-        
-        elif doc['errorCode'] == 'empty' or doc['contentLength'] == 0 or sum([ len(s) for s in doc['sentences'] ]) == 0:
-            doc['errorCode'] = 'empty'
-    
+    log.debug("Found {0} docs with missing fields".format(nDocWithMiss))
+       
     #log.debug(Counter([ doc['errorCode'] for doc in docList ]))
     
     # score 'em all
