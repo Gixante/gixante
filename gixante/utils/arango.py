@@ -232,7 +232,8 @@ def checkPivotCount(collectionName, nRand=100):
         actualCount = next(database.execute_query("FOR doc in news filter doc.partition == {0} collect with count into c return c".format(pc['partition'])))
         if actualCount != pc['nDocs']:
             pColl.update_by_example({'partition': pc['partition']}, {'nDocs': actualCount})
-            reportList.append({**pc, **{'actual': actualCount}})
+            pc.update({'actual': actualCount})
+            reportList.append(pc)
     
     report = pd.DataFrame(reportList)
     pctOff = len(report) / nRand
