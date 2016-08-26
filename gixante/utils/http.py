@@ -246,7 +246,7 @@ def addAll(doc, tree, fields, useForSentences):
     
     for f in fields:
         # adders mutates as new fields are added to doc!
-        adders = configureAdders(doc, tree, shouldHaveFields)
+        adders = configureAdders(doc, tree, shouldHaveFields, useForSentences)
         
         try:
             addFun, addParams = adders[f]
