@@ -5,7 +5,7 @@ import sys, urllib3, certifi, re, time
 from collections import defaultdict, Counter
 from lxml import etree
 
-from .parsing import log, classifierSplitter, knownErrors, domain, recogniseDate, cleanText, months
+from gixante.utils.parsing import log, classifierSplitter, knownErrors, domain, recogniseDate, cleanText, months
 
 # start a http pool manager and connect to ArangoDB
 log.info("Starting a HTTP connection...")
@@ -91,7 +91,7 @@ def getMetas(tree):
 def getTitle(tree):
     return(retWrapper(fullText(tree.xpath('//title[1]')[0]), 'title'))
 
-def getCreatedTs(URL, tree, minTs=631152000): # ignore dates before 1990-01-01
+def getCreatedTs(URL, tree=None, minTs=631152000): # ignore dates before 1990-01-01
     # try extracting it from the URL first
     try:
         dateTokens = [t for t in URL.split('/') if t in dateWords or re.match('^[0-9]{2,4}$', t)]
@@ -103,11 +103,12 @@ def getCreatedTs(URL, tree, minTs=631152000): # ignore dates before 1990-01-01
     # jump out if it's in the URL
     if len(urlAttempts) > 0: return(retWrapper(min(urlAttempts).timestamp(), 'createdTs'))
     
-    # otherwise go up the tree (jump out at the first match)
-    for txt in [ txt.strip() for txt in tree.xpath('//*/text()') ]:
-        if txt and len(txt) >= 6:
-            d = recogniseDate(txt)
-            if d: return(retWrapper(d.timestamp(), 'createdTs'))
+    # otherwise go up the tree if available(jump out at the first match)
+    if tree:
+        for txt in [ txt.strip() for txt in tree.xpath('//*/text()') ]:
+            if txt and len(txt) >= 6:
+                d = recogniseDate(txt)
+                if d: return(retWrapper(d.timestamp(), 'createdTs'))
     
     # extract it from the header
     try:

@@ -1,7 +1,8 @@
 import sys, pickle, time
 
-sys.path.append('/home/bean/Code/Python')
-from gixante.utils.arango import log, getCollection, assignBatchToPartitions, splitPartition, count
+sys.path.append('/home/bean/Code/gixante/gixante/utils')
+from arango import log, getCollection, assignBatchToPartitions, splitPartition, count, checkPivotCount
+#from gixante.utils.arango import log, getCollection, assignBatchToPartitions, splitPartition, count, checkPivotCount
 
 # runtime args
 if len(sys.argv) < 2: sys.argv.append("news")
@@ -21,19 +22,25 @@ weights, voc, coordModel = pickle.load(open('/home/bean/catapi_data/forManager.p
 ###
 
 # CAUTION: this is NOT threadsafe!
-
 partitionQ = "FOR doc in {0}Newbies LIMIT {1} RETURN"
-nDocsQ = "FOR doc in news FILTER doc.partition == {0} LIMIT %d COLLECT WITH COUNT INTO c RETURN c" % max(batchSize, partitionSize*2)
+pivCountErrTol = .05
 
 while True:
     # assign new docs to partitions
     if count(collectionName + 'Newbies') > batchSize:
         newCounts = assignBatchToPartitions(partitionQ.format(collectionName, batchSize), voc, weights, collectionName, coordModel)
+
         
         # now iterate over all the fat partitions
         log.info("Splitting large partitions...")
         [ splitPartition(pid, voc, weights, collectionName, partitionSize) for pid, count in newCounts.items() if count > partitionSize*2 ]
     
     else:
-        log.info("Not enough new documents - waiting a minute...")
+        log.info("Not enough new documents - will catch up with some housekeeping...")
+        
+        samplePivCountErr = 1
+        while samplePivCountErr > pivCountErrTol:
+            res = checkPivotCount(collectionName)
+            samplePivCountErr = res[1]*res[2]
+        
         time.sleep(60)

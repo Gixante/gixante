@@ -8,10 +8,12 @@ from itertools import chain, product
 from scipy.sparse import csr_matrix
 from sklearn.cluster import KMeans
 from sklearn.manifold import TSNE
-from collections import defaultdict
+from random import sample
+from collections import defaultdict#, Counter # Counter is only used for debug
+from datetime import datetime as dt # only used in PATCH
 
-from ..pyrango import Arango
-from .parsing import log, knownErrors, stripURL
+from gixante.pyrango import Arango
+from gixante.utils.parsing import log, knownErrors, stripURL
 
 # load config file
 cfg = json.load(open(os.path.join(*(['/'] + __file__.split('/')[:-1] + ['config.json']))))
@@ -134,7 +136,7 @@ def missingFromAll(URLs, collectionName):
 
 def count(collectionName, fast=True):
     if fast:
-        return(database.col('news').statistics['alive']['count'])
+        return(database.col(collectionName).statistics['alive']['count'])
     else:
         q = "FOR doc in %s COLLECT WITH COUNT INTO c RETURN c"
         return(next(database.execute_query(q % collectionName)))
@@ -209,7 +211,7 @@ def getPivots(collectionName, cacheFile='/tmp/pivots.pkl'):
             log.warning("Initialisation from cache failed - will reload from database")
             loadFromScratch = True
     
-    if LoadFromScratch:
+    if loadFromScratch:
         log.info("Getting pivots from %s - from scratch" % pivCollName)
         allPivotQ = "FOR piv in %s RETURN {'embedding': piv.embedding, 'partition': piv.partition, 'nDocs': piv.nDocs}" % pivCollName
         pivotDocs = list(database.execute_query(allPivotQ))
@@ -221,16 +223,25 @@ def getPivots(collectionName, cacheFile='/tmp/pivots.pkl'):
     pickle.dump((pivotIds, pivotVecs, pivotCounts), open('/tmp/pivots.pkl', 'wb'))
     return(pivotVecs, pivotIds, pivotCounts)
 
-def checkPivotCount(collectionName, nRand=100):     
+def checkPivotCount(collectionName, nRand=100):
+    log.info("Checking that the count on {0} random pids is correct...".format(nRand))
     pColl = database.col(collectionName + 'Pivots')
-    allPivotQ = "FOR piv in %s RETURN {'partition': piv.partition, 'nDocs': piv.nDocs}" % pivCollName
+    allPivotQ = "FOR piv in %s RETURN {'partition': piv.partition, 'nDocs': piv.nDocs}" % pColl.name
     pidCounts = list(database.execute_query(allPivotQ))
     
-    for pc in tqdm(sample(pidCounts, 100)):
+    reportList = []
+    for pc in tqdm(sample(pidCounts, nRand)):
         actualCount = next(database.execute_query("FOR doc in news filter doc.partition == {0} collect with count into c return c".format(pc['partition'])))
         if actualCount != pc['nDocs']:
-            #log.warning("Doc count for pid {0} is off: {1} vs {2} (actual)".format(pc['partition'], pc['nDocs'], actualCount))
             pColl.update_by_example({'partition': pc['partition']}, {'nDocs': actualCount})
+            reportList.append({**pc, **{'actual': actualCount}})
+    
+    report = pd.DataFrame(reportList)
+    pctOff = len(report) / nRand
+    meanErr = ((report['nDocs'] - report['actual']).abs() / report['actual']).mean()
+    log.info("{0:.1f}% were off - mean abs err = {1:.2f}%".format(100*pctOff, 100*meanErr))
+    
+    return(report, pctOff, meanErr)
 
 def getPivotIds(collectionName):
     return(np.array(list(database.execute_query("FOR p in %sPivots RETURN p.partition" % collectionName))))
@@ -241,17 +252,19 @@ def grouper(x):
     rank = x.dot(avg) / (np.abs(x-avg) / x.std(0)).mean(1)
     return(x[ np.argpartition(-rank, nCore)[:nCore] ].mean(0))
 
-def scoreBatch(docBatch, voc, weights, scoreType='zscores'):
+def scoreBatch(docBatch, voc, weights, scoreType='zscores', verbose=True):
     """
     Reads a batch of docs (list of deafaultdicts, expecting 'sentences' as a key containing the text)
     Returns a tuple of lists to be expanded into indices to build sparse matrices
     Done by sentence
     """
-    log.info("Parsing {0:,} documents...".format(len(docBatch)))
+    ct = tqdm if verbose else list
+    
+    if verbose: log.info("Parsing {0:,} documents...".format(len(docBatch)))
     docN = 0
     sentN = 0
     ixBySentence = []
-    for doc in tqdm(docBatch):
+    for doc in ct(docBatch):
         for sent in doc['sentences']:
             wordIndices = [ voc[w] for w in sent.split() if w in voc ]
             ixBySentence.append(([np.divide(1, len(wordIndices))], [sentN], wordIndices, [docN]))
@@ -269,7 +282,7 @@ def scoreBatch(docBatch, voc, weights, scoreType='zscores'):
     M = csr_matrix( (ixByWord[0], (ixByWord[1], ixByWord[2])), shape=(sentN, len(weights)), dtype=np.float32 )
     
     # score all the sentences
-    log.info("Scoring {0:,} documents, {1:,} sentences and {2:,} words...".format(docN, sentN, len(ixByWord[0])))
+    if verbose: log.info("Scoring {0:,} documents, {1:,} sentences and {2:,} words...".format(docN, sentN, len(ixByWord[0])))
     scores = M.dot(weights)
     norms = np.sqrt((scores**2).sum(axis=1)).reshape(-1,1)
     norms[ norms==0 ] = 1 # just to avoid NaNs later - TODO: is this needed?
@@ -345,19 +358,31 @@ def getCleanDocs(shortQuery, voc, weights, collectionName):
     Outputs: docs and vecs
     """
     # build the query
-    retFields = set(['_key', 'URL', 'contentLength', 'partition', 'parserLog', 'sentences' ])
+    retFields = set(['_key', 'URL', 'contentLength', 'partition', 'parserLog', 'sentences', 'errorCode' ])
     ret = ", ".join([ "'{0}': doc.{0}".format(f) for f in retFields ])
     query = shortQuery + ' {%s}' % ret
     
     log.info("Carefully retrieving documents...")
     docList = list(database.execute_query(query))
     
-    if len(docList) == 0:
-        return(docList, np.ndarray((0, weights.shape[1])))
+    #if len(docList) == 0:
+    #    return(docList, np.ndarray((0, weights.shape[1])))
     
     # PATCH: add new fields here
+    missingErrorCodesTs = []
+    missingErrorCodesN = 0
     for doc in docList:
-        if 'errorCode' not in doc: doc['errorCode'] = 'allGood'
+        if 'errorCode' not in doc or doc['errorCode'] is None:
+            missingErrorCodesN += 1
+            if 'parsedTs' in doc: missingErrorCodesTs.append(doc['parsedTs'][-1])
+            doc['errorCode'] = 'allGood'
+    
+    if len(missingErrorCodesTs) > 0:
+        tsFromTo = [ dt.strftime(dt.fromtimestamp(ts), "%Y-%m-%d %H:%M") for ts in [min(missingErrorCodesTs), max(missingErrorCodesTs)] ]
+        log.debug("PATCH: {0} docs retrieved by '{1}' had 'errorCode' missing - parsed between {2} and {3}".format(missingErrorCodesN, shortQuery, tsFromTo[0], tsFromTo[1])) 
+    else:
+        log.debug("PATCH: {0} docs retrieved by '{1}' had 'errorCode' missing".format(missingErrorCodesN, shortQuery)) 
+        
     # PATCH END
     
     log.info("Flagging parsing errors and empties...")
@@ -368,6 +393,8 @@ def getCleanDocs(shortQuery, voc, weights, collectionName):
         elif doc['errorCode'] == 'empty' or doc['contentLength'] == 0 or sum([ len(s) for s in doc['sentences'] ]) == 0:
             doc['errorCode'] = 'empty'
             #doc['contentLength'] = 0 don't use this no more in errors
+    
+    #log.debug(([ doc['errorCode'] for doc in docList ]))
     
     # score 'em all
     docList2, vecs = scoreBatch([ doc for doc in docList if doc['errorCode'] == 'allGood' ], voc, weights)
@@ -390,6 +417,26 @@ def getCleanDocs(shortQuery, voc, weights, collectionName):
     for ix in uniDupes.itertuples(index=False):
         docList3[ix.dupeIx]['errorCode'] = 'duplicated'
         docList3[ix.dupeIx]['dupliURL'] = docList3[ix.origIx]['URL']
+    
+    #log.debug(Counter([ doc['errorCode'] for doc in docList ]))
+    
+    # PATCH: check that dupes are actually dupes
+    log.debug("PATCH: double checking dupes...")
+    dupeDocs = [ doc for doc in docList if doc['errorCode'] == 'duplicated' ]
+    fields = ['source', 'ampLink', 'canonicalLink', 'title', 'createdTs', 'links', 'metas', 'body', 'sentences', 'contentLength']
+    useForSentences = 'body'
+    misDuped = []
+    for ix, doc in tqdm(list(enumerate(dupeDocs))):
+        _, vecDuo = scoreBatch([doc] + [d for d in docList if d['URL'] == doc['dupliURL']], voc, weights, verbose=False)
+        if np.linalg.norm(vecDuo[0] - vecDuo[1]) > 1e-8:
+            log.error("Looks like doc {0} is not really a dupe!".format(ix))
+            misDuped.append(ix)
+    if len(misDuped) > 0:
+        # dump data and crash
+        dumpFile = '/tmp/dump_{0}'.format(int(time.time()))
+        pickle.dump({'docList': docList, 'misDuped': misDuped}, open(dumpFile, 'wb'))
+        raise RuntimeError("Mis-dupes found  - dumped at {0}".format(dumpFile))
+    # PATCH END
     
     #errorDocs = [ {**doc, **{'skinnyURL': stripURL(doc['URL'])}} for doc in docList if doc['errorCode'] != 'allGood' ]
     errorDocs = []
@@ -447,7 +494,7 @@ def assignBatchToPartitions(shortQuery, voc, weights, collectionName, coordModel
 def splitPartition(partitionId, voc, weights, collectionName, partitionSize=250):
 
     log.info("Splitting partition %d in %s (aiming at partitionSize=%d)..." % (partitionId, collectionName, partitionSize))
-    shortQuery = "FOR doc in {0} FILTER doc.partition == {1} LIMIT 5000 RETURN".format(collectionName, partitionId) 
+    shortQuery = "FOR doc in {0} FILTER doc.partition == {1} RETURN".format(collectionName, partitionId) 
     
     docs, vecs = getCleanDocs(shortQuery, voc, weights, collectionName)
     

@@ -4,7 +4,7 @@ from flask import Flask, request
 from flask_restful import Resource, Api
 import numpy as np
 
-from gixante.utils.arango import database, scoreBatch, cfg, getPivots, count
+from gixante.utils.arango import database, scoreBatch, cfg, getPivots
 from gixante.utils.parsing import classifierSplitter, log
 
 if len(sys.argv) < 2: sys.argv.append("news")
