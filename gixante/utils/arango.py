@@ -378,7 +378,6 @@ def getCleanDocs(shortQuery, voc, weights, collectionName):
             doc, _ = addAll(doc, None, missingFields, None)
             stillMissing = [ f for f in retFields if emptyField(doc, f) ]
             if stillMissing:
-                print(stillMissing)
                 # TODO: instead, re-queue the docs with a 'forceUpdate' flag
                 try:
                     tree = etree.ElementTree(etree.HTML(urlPoolMan.request('GET', URL).data))

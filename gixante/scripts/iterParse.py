@@ -15,7 +15,7 @@ bufferLength = int(sys.argv[2])
 forceReParse = False
 
 # configurations for different collections (TODO: put in a config file)
-f1 = ['source', 'ampLink', 'canonicalLink', 'title', 'createdTs', 'links', 'metas']
+f1 = ['source', 'ampLink', 'canonicalLink', 'title', 'createdTs', 'parsedTs', 'links', 'metas']
 f2 = ['sentences', 'contentLength', 'errorCode']
 
 collArgs = {

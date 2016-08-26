@@ -21,6 +21,7 @@ def configureAdders(doc, tree=None, shouldHaveFields=[], useForSentences=None):
     # start with functions that don't require the 'tree' of the document
     fields2Adders = {
         'createdTs'          : [addCreatedTs, {'URL': doc['URL']}],
+        'parsedTs'           : [addParsedTs, {'parsedTs': doc.get('parsedTs', [])}],
         'sentences'          : [addSentences, {'textObj': _useForSentencesObj}],
         'contentLength'      : [addContentLength, {'sentences': doc['sentences']}],
         'domain'             : [addDomain, {'URL': doc['URL']}],
@@ -56,7 +57,6 @@ def parseHTML(URL, fields, useForSentences):
     out = {
         'URL'          : URL,
         'domain'       : domain(URL),
-        'parsedTs'     : [time.time()],
         'partition'    : 0,
         'errorCode'    : 'allGood',
         'parserLog'    : [],
@@ -134,6 +134,10 @@ def getMetas(tree):
 
 def getTitle(tree):
     return(retWrapper(fullText(tree.xpath('//title[1]')[0]), 'title'))
+
+def addParsedTs(parsedTs):
+    if type(parsedTs) is not list: parsedTs = []
+    return(retWrapper(parsedTs + [time.time()], 'parsedTs'))
 
 def addCreatedTs(URL):
     # try extracting a timestamp from the URL
