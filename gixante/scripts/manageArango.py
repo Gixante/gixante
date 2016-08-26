@@ -1,8 +1,6 @@
 import sys, pickle, time
 
-sys.path.append('/home/bean/Code/gixante/gixante/utils')
-from arango import log, getCollection, assignBatchToPartitions, splitPartition, count, checkPivotCount
-#from gixante.utils.arango import log, getCollection, assignBatchToPartitions, splitPartition, count, checkPivotCount
+from gixante.utils.arango import log, getCollection, assignBatchToPartitions, splitPartition, count, checkPivotCount
 
 # runtime args
 if len(sys.argv) < 2: sys.argv.append("news")
