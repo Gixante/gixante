@@ -272,17 +272,14 @@ def addAll(doc, tree, fields, useForSentences):
 # lxml utils
 def fullText(x):
     # mimicks bs4's getText()
-    txt1 = x.text
-    if txt1:
-        return((txt1 + x.findtext('*', default='')).strip())
-    else:
-        return((x.findtext('*', default='')).strip())
+    return(''.join([ s.strip() for s in x.itertext() ]))
 
 
 def findFatP(tree):
     peas = [ p for p in tree.xpath('//p') if p.text ]
     paths = [ re.sub('\[[0-9]*\]|/p.*$', '', tree.getpath(p)) for p in peas ]
     texts = [ fullText(p) for p in peas ]
+    
     nSpaces = [ len(t.split()) if t else 0 for t in texts ]
     # sum the #spaces by path
     sumSpaces = defaultdict(int)

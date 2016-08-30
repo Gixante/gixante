@@ -181,6 +181,7 @@ def createPivot(doc, vec, pivotColl, partitionId, nDocs):
 def getPivots(collectionName, cacheFile='/tmp/pivots.pkl'):
     
     pivCollName = collectionName + 'Pivots'
+    loadFromScratch = True
     
     if os.path.exists(cacheFile):
         try:
