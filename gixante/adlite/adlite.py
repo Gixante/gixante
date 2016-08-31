@@ -10,7 +10,7 @@ runDebug = sys.argv[-1].lower() == 'debug'
 #log.setLevel(0)
 #else:
 apiRoot = 'http://{0}:{1}'.format(cfg[ 'newsApiIP' ], cfg[ 'newsApiPort' ])
-log.setLevel(0)
+log.setLevel(20)
 
 nGet = 1000
 nReturnDocs = 25
