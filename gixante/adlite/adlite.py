@@ -20,7 +20,7 @@ app = Flask(__name__)
 app.config.from_object(__name__)
 
 lastHB = 'Heartbeat monitor not initialised'
-
+"""
 def hbCheck():
     global lastHB
     return(lastHB)
@@ -39,10 +39,10 @@ def hbBackground():
         
         time.sleep(10)
 
-app.jinja_env.globals.update(APIstatus=hbCheck)
+#app.jinja_env.globals.update(APIstatus=hbCheck)
 #hbThread = Thread(target=hbBackground, name='hbBackground', daemon=True)
 #hbThread.start()
-
+"""
 # ROUTING - BASIC PAGES
 @app.route('/')
 @app.route('/index')
