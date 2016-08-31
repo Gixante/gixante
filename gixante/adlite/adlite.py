@@ -5,12 +5,12 @@ from threading import Thread
 
 runDebug = sys.argv[-1].lower() == 'debug'
 
-if runDebug:
-    apiRoot = 'http://localhost:5000'
-    log.setLevel(0)
-else:
-    apiRoot = 'http://{0}:{1}'.format(cfg[ 'newsApiIP' ], cfg[ 'newsApiPort' ])
-    log.setLevel(20)
+#if runDebug:
+#apiRoot = 'http://localhost:5000'
+#log.setLevel(0)
+#else:
+apiRoot = 'http://{0}:{1}'.format(cfg[ 'newsApiIP' ], cfg[ 'newsApiPort' ])
+log.setLevel(0)
 
 nGet = 1000
 nReturnDocs = 25
@@ -136,11 +136,11 @@ def api_error(code, message=None):
 
 log.info("Ready for business!")
 
-if runDebug:
-    if __name__ == '__main__':
-        app.run(host='0.0.0.0', port=(5000 + runDebug), debug=runDebug)
-    
-    log.info("Goodbye!") 
+#if runDebug:
+#    if __name__ == '__main__':
+#        app.run(host='0.0.0.0', port=(5000 + runDebug), debug=runDebug)
+#    
+#    log.info("Goodbye!") 
     
     
     
