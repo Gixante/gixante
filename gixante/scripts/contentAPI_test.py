@@ -18,20 +18,19 @@ testStatsPut = put(apiRoot + '/addSiteStat/site={0}'.format(site), data={'dummy'
 
 log.info("Testing resource 'SimilToText'...")
 testSimilPost = put(apiRoot + '/post', data={'text': 'this is a simple test', '_flag': 'test'})
-testSimilPut = put(apiRoot + '/put/csvWords=this,is,a,simple,test')
-database.col(testSimilPut['_id'].split('/')[0]).update_document(testSimilPut['_id'].split('/')[1], {'_flag': 'test'})
+database.col(testSimilPost['_id'].split('/')[0]).update_document(testSimilPost['_id'].split('/')[1], {'_flag': 'test'})
 
-testSimilGet = get(apiRoot + '/get/id={0}/fields=queryInProgress,nDocs/minNumDocs=25/nMoreDocs=1000/docFields=URL'.format(testSimilPut['_key']))
-testSimilGetStatus = get(apiRoot + '/get/id={0}/fields=queryInProgress,nDocs'.format(testSimilPut['_key']))
+testSimilGet = get(apiRoot + '/get/id={0}/fields=queryInProgress,nDocs/minNumDocs=25/nMoreDocs=1000/docFields=URL'.format(testSimilPost['_key']))
+testSimilGetStatus = get(apiRoot + '/get/id={0}/fields=queryInProgress,nDocs'.format(testSimilPost['_key']))
 while testSimilGetStatus['queryInProgress']:
-    testSimilGetStatus = get(apiRoot + '/get/id={0}/fields=queryInProgress,nDocs'.format(testSimilPut['_key']))
+    testSimilGetStatus = get(apiRoot + '/get/id={0}/fields=queryInProgress,nDocs'.format(testSimilPost['_key']))
     print("Fetched so far: {0}".format(testSimilGetStatus['nDocs']), end="\r")
 
 log.info("Testing resource 'Semantic'...")
-testSema1 = get(apiRoot + '/semantic/id={0}/nEachSide=10/minNumDocs=100/rankPctDocs=0.5/semaSearch=positive'.format(testSimilPut['_key']))
+testSema1 = get(apiRoot + '/semantic/id={0}/nEachSide=10/minNumDocs=100/rankPctDocs=0.5/semaSearch=positive'.format(testSimilPost['_key']))
 testSema2 = get(apiRoot + '/semantic/id={0}/nEachSide=10/semaSearch=positive'.format(testSimilPost['_key']))
-testSema3 = get(apiRoot + '/semantic/id={0}/nEachSide=10/minNumDocs=100/rankPctDocs=0.5'.format(testSimilPut['_key']), data={'semaSearch': 'cool'})
+testSema3 = get(apiRoot + '/semantic/id={0}/nEachSide=10/minNumDocs=100/rankPctDocs=0.5'.format(testSimilPost['_key']), data={'semaSearch': 'cool'})
 testSema4 = get(apiRoot + '/semantic/id={0}/nEachSide=10'.format(testSimilPost['_key']), data={'semaSearch': 'cool'})
 
 log.info("Cleaning up the database...")
-cleanupTests([ d['_id'].split('/')[0] for d in [testStatsPut, testSimilPut] ])
+cleanupTests([ d['_id'].split('/')[0] for d in [testStatsPut, testSimilPost] ])

@@ -1,6 +1,7 @@
-import sys
+import sys, time
 from flask import Flask, request, url_for, render_template
 from gixante.utils.api import get, put, cfg, log, checkHeartbeat, HeartbeatError
+from threading import Thread
 
 runDebug = sys.argv[-1].lower() == 'debug'
 
@@ -9,6 +10,7 @@ if runDebug:
     log.setLevel(0)
 else:
     apiRoot = 'http://{0}:{1}'.format(cfg[ 'newsApiIP' ], cfg[ 'newsApiPort' ])
+    log.setLevel(20)
 
 nGet = 1000
 nReturnDocs = 25
@@ -17,17 +19,28 @@ nSemantic = 10
 app = Flask(__name__)
 app.config.from_object(__name__)
 
+lastHB = 'Heartbeat monitor not initialised'
+
 def hbCheck():
-    try:
-        checkHeartbeat(apiRoot + '/heartbeat')
-        return('OK')
-    except HeartbeatError as hbe:
-        return(hbe.__str__())
-    except Exception as e:
-        log.debug(sys.exc_info().__str__())
-        return("An internal error has occurred")
+    return(lastHB)
+
+def hbBackground():
+    global lastHB
+    while True:
+        try:
+            checkHeartbeat(apiRoot + '/heartbeat')
+            lastHB = 'OK'
+        except HeartbeatError as hbe:
+            lastHB = hbe.__str__()
+        except Exception as e:
+            log.debug(sys.exc_info().__str__())
+            lastHB = "An internal error has occurred"
+        
+        time.sleep(10)
 
 app.jinja_env.globals.update(APIstatus=hbCheck)
+hbThread = Thread(target=hbBackground, name='hbBackground', daemon=True)
+hbThread.start()
 
 # ROUTING - BASIC PAGES
 @app.route('/')
@@ -63,7 +76,7 @@ def contact(message=''):
 
 @app.route('/add_contact', methods=['POST', 'GET'])
 def add_contact():
-    data = dict(request.form)
+    data = dict([ (k, v) for k, v in request.form.items() ])
     if runDebug: data.update({'_flag': 'test'})
     res = put(apiRoot + '/addSiteStat/site=adlite', data=data)
     return(render_template('thankyou.html'))
@@ -78,7 +91,7 @@ def ad_demo(NUerror=None):
 
 @app.route('/ad_initial', methods=['POST', 'GET'])
 def ad_initial():
-    data = data={'text': request.form['paragraph']}
+    data = dict([ (k, v) for k, v in request.form.items() ])
     if runDebug: data.update({'_flag': 'test'})
     res = put(apiRoot + '/post', data=data)
     if 'NUerror' in res:
@@ -123,14 +136,11 @@ def api_error(code, message=None):
 
 log.info("Ready for business!")
 
-#if __name__ == '__main__':
-#    app.run(host='0.0.0.0', port=(5000 + runDebug), debug=runDebug)
-#    
-#log.info("Goodbye!") 
-
+if runDebug:
+    if __name__ == '__main__':
+        app.run(host='0.0.0.0', port=(5000 + runDebug), debug=runDebug)
     
-    
-    
+    log.info("Goodbye!") 
     
     
     

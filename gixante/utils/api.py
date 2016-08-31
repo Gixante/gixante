@@ -91,4 +91,5 @@ def get(url, data=None, **kwargs):
     return(_requestWrap('GET', url, data=data, **kwargs))
 
 def put(url, data=None, **kwargs):
+    if data is not None: data.update({'createdTs': time.time()})
     return(_requestWrap('PUT', url, data=data, **kwargs))

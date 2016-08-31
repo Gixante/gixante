@@ -71,7 +71,7 @@ def findOpposite(word, nCandidates=5000, nRelevShifts=5):
     weightedShift = unitVec(shiftRelevance.dot(shiftedVecs))
     
     simil = weights[ candidateIx, : ].dot(weightedShift)
-    print([ (vocInv[candidateIx[ix]], simil[ix].mean()) for ix in np.argsort(-simil)[:10] ])
+    log.debug([ (vocInv[candidateIx[ix]], simil[ix].mean()) for ix in np.argsort(-simil)[:10] ])
     return(vocInv[candidateIx[np.argmax(simil)]])
 
 def contextRank(sentence, contextVec):
@@ -112,21 +112,15 @@ class Heartbeat(Resource):
 
 class Statistics(Resource):
     def put(self, site):
-        return(database.col(site + 'Stats').create_document(request.form))
+        data = dict([ (k, v) for k, v in request.form.items() ])
+        return(database.col(site + 'Stats').create_document(data))
     
     def get(self):
         return(database.col(docCollName).statistics)
 
 class SimilToText(Resource):
-    def put(self, csvWords=None):
-        queryData = dict()
-        queryData['createdTs'] = time.time()
-        if 'info' in request.form: queryData['info'] = request.form['info']
-        if csvWords:
-            queryData['text'] = ' '.join(csvWords.split(','))
-        else:
-            queryData['text'] = request.form['text']
-        
+    def put(self):
+        queryData = dict([ (k, v) for k, v in request.form.items() ])
         queryData['docs'] = []
         queryData['nDocs'] = 0
         sentences = classifierSplitter(queryData['text'])
@@ -211,7 +205,6 @@ api.add_resource(Statistics, '/getCollStats', '/addSiteStat/site=<string:site>')
 api.add_resource(SimilToText, 
     '/get/id=<string:queryId>/fields=<string:fields>/minNumDocs=<int:minNumDocs>/nMoreDocs=<int:nMoreDocs>/docFields=<string:docFields>', 
     '/get/id=<string:queryId>/fields=<string:fields>',
-    '/put/csvWords=<string:csvWords>', 
     '/post'
     )
 api.add_resource(Semantic,
