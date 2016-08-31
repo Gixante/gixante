@@ -217,7 +217,7 @@ api.add_resource(Semantic,
 log.info("Ready for business!")
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=runDebug)
+    app.run(host='0.0.0.0', port=cfg['newsApiPort'], debug=runDebug)
     
 log.info("Goodbye!") 
 

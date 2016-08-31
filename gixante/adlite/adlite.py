@@ -1,7 +1,7 @@
 import sys, time
 from flask import Flask, request, url_for, render_template
 from gixante.utils.api import get, put, cfg, log, checkHeartbeat, HeartbeatError
-#from threading import Thread
+from threading import Thread
 
 runDebug = sys.argv[-1].lower() == 'debug'
 
@@ -20,7 +20,7 @@ app = Flask(__name__)
 app.config.from_object(__name__)
 
 lastHB = 'Heartbeat monitor not initialised'
-"""
+
 def hbCheck():
     global lastHB
     return(lastHB)
@@ -39,10 +39,10 @@ def hbBackground():
         
         time.sleep(10)
 
-#app.jinja_env.globals.update(APIstatus=hbCheck)
-#hbThread = Thread(target=hbBackground, name='hbBackground', daemon=True)
-#hbThread.start()
-"""
+app.jinja_env.globals.update(APIstatus=hbCheck)
+hbThread = Thread(target=hbBackground, name='hbBackground', daemon=True)
+hbThread.start()
+
 # ROUTING - BASIC PAGES
 @app.route('/')
 @app.route('/index')
@@ -137,11 +137,11 @@ def api_error(code, message=None):
 
 log.info("Ready for business!")
 
-#if runDebug:
-#    if __name__ == '__main__':
-#        app.run(host='0.0.0.0', port=(5000 + runDebug), debug=runDebug)
-#    
-#    log.info("Goodbye!") 
+if runDebug:
+   if __name__ == '__main__':
+       app.run(host='0.0.0.0', port=(5000 + runDebug), debug=runDebug)
+   
+   log.info("Goodbye!") 
     
     
     
