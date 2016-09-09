@@ -7,7 +7,6 @@ from collections import defaultdict, Counter
 from Levenshtein import distance
 
 from gixante.utils.common import log, classifierSplitter, recogniseDate, cleanText, stripURL, knownErrors
-__file__ = '/home/bean/gixante/gixante/utils/scraping.py'
 
 # load config file
 configFile = os.path.join(*(['/'] + __file__.split('/')[:-1] + ['scraperConfig.tsv']))

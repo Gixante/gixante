@@ -361,7 +361,7 @@ def getCleanDocs(shortQuery, voc, weights, collectionName):
     rePublishKeys.update(['URL'])
     # don't validate URL: a valid string has to be there and it's too painful if it's missing www. or http.
     #validableKeys = validableKeys.difference(['URL'])
-    e = scraping.ErrorCode(shouldHaveFields=validableKeys)
+    e = parsing.ErrorCode(shouldHaveFields=validableKeys)
     
     ret = ", ".join([ "'{0}': doc.{0}".format(f) for f in retKeys ])
     query = shortQuery + ' {%s}' % ret
