@@ -3,7 +3,7 @@ from tqdm import tqdm
 
 from gixante.utils.rabbit import hat, cfg, log
 from gixante.utils.arango import addErrors, addDocs, getRandomLinks, missingFromAll
-import gixante.utils.parsing
+import gixante.utils.parsing as parsing
 
 # runtime args
 if len(sys.argv) < 2: sys.argv.append("news")

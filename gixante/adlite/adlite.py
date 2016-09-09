@@ -4,7 +4,7 @@ from flask import Flask, request, url_for, render_template
 import gixante.utils.api
 api.configForCollection('news')
 
-from gixante.utils.parsing import log
+from gixante.utils.common import log
 
 runDebug = sys.argv[-1].lower() == 'debug'
 

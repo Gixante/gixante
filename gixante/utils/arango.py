@@ -15,7 +15,7 @@ from lxml import etree # only used if not using rabbit
 from gixante.pyrango import Arango
 from gixante.utils.common import log, knownErrors, stripURL, cfg
 from gixante.utils.rabbit import hat
-import gixante.utils.parsing
+import gixante.utils.parsing as parsing
 
 # STARTUP
 log.info("Connecting to ArangoDB...")

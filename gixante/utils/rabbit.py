@@ -4,7 +4,7 @@
 import pika, sys, re, json
 
 from gixante.utils.common import log, cfg
-import gixante.utils.parsing
+import gixante.utils.parsing as parsing
 
 parsing.configForCollection()
 parsing.requiredFields = [ 'URL', 'skinnyURL', 'domain' ]

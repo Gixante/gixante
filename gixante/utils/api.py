@@ -4,7 +4,7 @@ Keep it light! (don't load big files)
 """
 
 import sys, requests, json, os, time, re
-from gixante.utils.parsing import cfg
+from gixante.utils.common import cfg
 
 # configure a heartbeat as a global variable
 global heartbeat, rootUrl
