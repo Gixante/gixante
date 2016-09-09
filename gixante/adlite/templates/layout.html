@@ -1,5 +1,4 @@
-{% set APIok = APIstatus() == "OK" -%}
-{% if APIok %}
+{% if APIok() %}
 	{% set navigation_bar = [
 		('about', 'About'),
 		('publishers', 'Publishers'),
@@ -25,14 +24,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
 	
+	{% if requestFailed %}
+		<meta http-equiv="refresh" content="0;url={{ url_for('api_error', code=APIcode, message=APImessage)}}" />
+	{% endif %}
+	
 	<meta name="description" content="">
     <meta name="author" content="Gixante LTD">
     <link rel="icon" href="{{ url_for('static', filename='adlite_favicon.png') }}">
 
     <!-- Bootstrap core CSS -->
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
-    
-    <!-- <p>{{ APIstatus() }}</p> -->
     
 	{% block head %}
 	{% endblock %}

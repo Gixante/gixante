@@ -7,8 +7,8 @@ if len(sys.argv) < 2: sys.argv.append("news")
 if len(sys.argv) < 3: sys.argv.append("adlite")
 if len(sys.argv) < 4: sys.argv.append("20") # INFO logging level
 
-apiRoot = 'http://{0}:{1}'.format(cfg[ sys.argv[1] + 'ApiIP' ], cfg[ sys.argv[1] + 'ApiPort' ])
-#apiRoot = 'http://localhost:5000'
+#apiRoot = 'http://{0}:{1}'.format(cfg[ sys.argv[1] + 'ApiIP' ], cfg[ sys.argv[1] + 'ApiPort' ])
+apiRoot = 'http://localhost:9999'
 site = sys.argv[2]
 log.setLevel(int(sys.argv[3]))
 

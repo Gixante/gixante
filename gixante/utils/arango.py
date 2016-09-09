@@ -13,50 +13,35 @@ from collections import defaultdict, Counter # Counter is only used for debug
 from lxml import etree # only used if not using rabbit
 
 from gixante.pyrango import Arango
-from gixante.utils.parsing import log, knownErrors, stripURL, emptyField, cfg
-from gixante.utils.http import addAll, urlPoolMan # only used if not using rabbit
-#from gixante.utils.rabbit import publishLinks one for the future
+from gixante.utils.common import log, knownErrors, stripURL, cfg
+from gixante.utils.rabbit import hat
+import gixante.utils.parsing
 
 # STARTUP
 log.info("Connecting to ArangoDB...")
 database = Arango(host=cfg['arangoIP'], port=cfg['arangoPort'], password=cfg['arangoPwd']).db('catapi')
+parsing.configForCollection()
+parser = parsing.Parser()
+# don't touch the URL - it's indexing the collection!
+parser.fields = dict([ (k, f) for k, f in parser.fields.items() if f.name != 'URL' ])
 
 # FUNCTIONS
 # Error handler
 def addErrors(errorDocs, collectionName):
-    # errorDocs is a list of dictionaries containing (at least): 'URL', 'skinnyURL' (to check for missing), 'errorCode' (a key from knownErrors)
+    # errorDocs is a list of dictionaries containing at least: 'URL' and 'errorCode' (a key from knownErrors)
     
+    validDocs = [ doc for doc in errorDocs if 'errorCode' in doc and doc['errorCode'] != 'allGood' and 'URL' in doc ]
+    
+    for doc in validDocs:
+        if 'skinnyURL' not in doc: doc['skinnyURL'] = stripURL(doc['URL'])
+    
+    # check if errors are already in DB
     newErrSkinnies = missing('skinnyURL', '^%sErrors' % collectionName, [ e['skinnyURL'] for e in errorDocs ])
     
     errors = []
-    for doc in errorDocs:
-        if doc['errorCode'] == 'allGood' or doc['skinnyURL'] not in newErrSkinnies: # i.e. no error or already in DB
-            continue
-            
-        if doc['errorCode'] not in knownErrors:
-            doc['otherErrorMessage'] = "Invalid error code: " + doc['errorCode']
-            doc['errorCode'] = 'otherError'
-        
-        err = {
-            'raisedTs': int(time.time()), 
-            'URL': doc['URL'], 
-            'skinnyURL': doc['skinnyURL'], 
-            'errorCode': doc['errorCode'],
-            }
-        
-        # some codes require extra fields:
-        if doc['errorCode'] == 'parsingError' and 'parserLog' in doc:
-            err['parserLog'] = doc['parserLog']
-            
-        if doc['errorCode'] == 'duplicated' and 'dupliURL' in doc:
-            err['dupliURL'] = doc['dupliURL']
-            
-        if doc['errorCode'] in ['empty', 'duplicated'] and 'usedForBody' in doc:
-            err['usedForBody'] = doc['usedForBody']
-        
-        if doc['errorCode'] == 'otherError' and 'otherErrorMessage' in doc:
-            err['otherMessage'] = doc['otherErrorMessage']
-        
+    for doc in [ d for d in validDocs if d['skinnyURL'] in newErrSkinnies ]:
+        err = dict([ (k, v) for k, v in doc.items() if k in doc and k in ['URL', 'skinnyURL', 'errorCode', 'parserLog', 'dupliURL', 'otherErrorMessage', 'usedForBody' ] ])
+        err['raisedTs'] = time.time()
         errors.append(err)
     
     # TODO: use batches!
@@ -84,19 +69,30 @@ def addDocs(docs, collectionName):
 def delDocs(docs, collectionName):
     res = []
     # TODO: use batches!
-    URLs = exist('URL', '^%s$' % collectionName, [ doc['URL'] for doc in docs])
+    URLs = exist('URL', '^%s$' % collectionName, [ doc['URL'] for doc in docs ])
     if len(URLs):
         q = "FOR doc in {0} FILTER doc.URL in {1} REMOVE doc IN {0} OPTIONS {{ ignoreErrors: true }}".format(collectionName, list(URLs))
         res = database.execute_query(q)
     
-    log.info("Deleted {0} documents from {1}".format(len(URLs), collectionName))
+    log.info("Deleted {0} documents from '{1}'".format(len(URLs), collectionName))
+    
+    return(res)
+
+def delErrors(errors, collectionName):
+    res = []
+    # TODO: use batches!
+    skinnyURLs = exist('skinnyURL', '^%sErrors$' % collectionName, [ err['skinnyURL'] if 'skinnyURL' in err else stripURL(err['URL']) for err in errors])
+    if len(skinnyURLs):
+        q = "FOR doc in {0}Errors FILTER doc.skinnyURL in {1} REMOVE doc IN {0}Errors OPTIONS {{ ignoreErrors: true }}".format(collectionName, list(skinnyURLs))
+        res = database.execute_query(q)
+    
+    log.info("Deleted {0} errors from '{1}Errors'".format(len(skinnyURLs), collectionName))
     
     return(res)
 
 def getRandomLinks(collectionName, nDocs=25):
-    randomQ = "FOR doc in {0} FILTER doc.partition > 0 FILTER doc.links != NULL LIMIT {1} SORT RAND() LIMIT {2} RETURN doc.links"
-    linkIter = database.execute_query(randomQ.format(collectionName, nDocs**2, nDocs))
-    return([ l for ll in linkIter for l in ll ])
+    randomQ = "FOR doc in {0} FILTER doc.partition > 0 FILTER doc.links != NULL LIMIT {1} SORT RAND() LIMIT {2} RETURN {{'links': doc.links, 'ref': doc.URL}}"
+    return(database.execute_query(randomQ.format(collectionName, nDocs**2, nDocs)))
 
 def exist(what, collRgx, stringIter):
     
@@ -358,37 +354,50 @@ def getCleanDocs(shortQuery, voc, weights, collectionName):
     Outputs: docs and vecs
     """
     # build the query (NOTE: order is important! Same as collArgs['fields'] in iterParse)
-    retFields = [ '_key', 'URL', 'domain', 'parserLog', 'createdTs', 'parsedTs', 'sentences', 'contentLength', 'errorCode' ]
-    ret = ", ".join([ "'{0}': doc.{0}".format(f) for f in retFields ])
+    retKeys = [ '_key', 'URL', 'domain', 'parserLog', 'createdTs', 'parsedTs', 'sentences', 'contentLength', 'errorCode' ]
+    
+    validableKeys = set([ k for k in retKeys if k in parser.fields ])
+    rePublishKeys = validableKeys.difference(['sentences', 'contentLength'])
+    rePublishKeys.update(['URL'])
+    # don't validate URL: a valid string has to be there and it's too painful if it's missing www. or http.
+    #validableKeys = validableKeys.difference(['URL'])
+    e = scraping.ErrorCode(shouldHaveFields=validableKeys)
+    
+    ret = ", ".join([ "'{0}': doc.{0}".format(f) for f in retKeys ])
     query = shortQuery + ' {%s}' % ret
     
     log.info("Carefully retrieving documents...")
     docList = list(database.execute_query(query))
+        
+    # Integrity checks: add new fields in retKeys and they will be lazily added (without re-downloading the doc) or ...
+    log.info("Checking for missing fields...")
+    parseAgain = []
+    for ix in range(len(docList)):
+        if not e.containsValid(docList[ix]): docList[ix] = e.update(docList[ix])
+        if docList[ix]['errorCode'] != 'allGood': continue
+                
+        allValid = all([ parser.fields[k].containsValid(docList[ix]) for k in validableKeys ])
+        if not allValid:
+            # try to reparse offline
+            docList[ix] = parser.strip(parser.parseDoc(docList[ix]))
+            allValid = all([ parser.fields[k].containsValid(docList[ix]) for k in validableKeys ])
+            if not allValid:
+                #print(docList[ix]['URL'][:50], [ k for k in validableKeys if not parser.fields[k].containsValid(docList[ix]) ])
+                parseAgain.append(dict([ (k, docList[ix][k]) for k in rePublishKeys if k in docList[ix] ]))
+    
+    log.debug("Found {0} docs (out of {1}) with missing fields (to re-queue to '{2}')".format(len(parseAgain), len(docList), collectionName))
+    if parseAgain:
+        hat.multiPublish(collectionName, [ json.dumps(doc) for doc in parseAgain ])
+        # remove errors from main collection and from Newbies
+        res = delDocs(parseAgain, collectionName)
+        res = delDocs(parseAgain, collectionName + 'Newbies')
+        res = delErrors(parseAgain, collectionName)
+        docList= [ doc for doc in docList if doc['URL'] not in [ d['URL'] for d in parseAgain ] ]
+    
+    log.debug(Counter([ doc['errorCode'] for doc in docList ]))
     
     if len(docList) == 0:
         return(docList, np.ndarray((0, weights.shape[1])))
-    
-    # Integrity checks: add new fields in retFields and they will be lazily added (without re-downloading the doc) or ...
-    log.info("Checking for missing fields...")
-    nDocWithMiss = 0
-    # don't parse known errors again
-    for doc in tqdm([ d for d in docList if d['errorCode'] == 'allGood' or not d['errorCode'] ]):
-        missingFields = [ f for f in retFields if emptyField(doc, f) ]
-        if missingFields:
-            nDocWithMiss = nDocWithMiss =+ 1
-            doc, _ = addAll(doc, None, missingFields, None)
-            stillMissing = [ f for f in retFields if emptyField(doc, f) ]
-            if stillMissing:
-                # TODO: instead, re-queue the docs with a 'forceUpdate' flag
-                try:
-                    tree = etree.ElementTree(etree.HTML(urlPoolMan.request('GET', URL).data))
-                    doc, _ = addAll(doc, tree, stillMissing, None)
-                except:
-                    doc['errorCode'] = 'cannotDownload'
-    
-    log.debug("Found {0} docs with missing fields".format(nDocWithMiss))
-       
-    log.debug(Counter([ doc['errorCode'] for doc in docList ]))
     
     # score 'em all
     docList2, vecs = scoreBatch([ doc for doc in docList if doc['errorCode'] == 'allGood' ], voc, weights)
@@ -438,6 +447,8 @@ def assignBatchToPartitions(shortQuery, voc, weights, collectionName, coordModel
     
     log.info("Assigning documents to partitions:")
     docs, vecs = getCleanDocs(shortQuery, voc, weights, collectionName)
+    
+    if not docs: return({})
     
     log.info("Assigning geo index...")
     xx = coordModel['rfx'].predict(vecs)

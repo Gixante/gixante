@@ -11,6 +11,9 @@ collectionName = sys.argv[1]
 partitionSize = int(sys.argv[2])
 batchSize = int(sys.argv[3])
 
+partitionQ = "FOR doc in {0}Newbies LIMIT {1} RETURN"
+pivCountErrTol = .05
+
 # check indices and other stuff
 #collection = getCollection(collectionName)
 
@@ -20,8 +23,6 @@ weights, voc, coordModel = pickle.load(open(cfg['dataDir'] + '/forManager.pkl', 
 ###
 
 # CAUTION: this is NOT threadsafe!
-partitionQ = "FOR doc in {0}Newbies LIMIT {1} RETURN"
-pivCountErrTol = .05
 
 while True:
     # assign new docs to partitions
@@ -34,10 +35,10 @@ while True:
     
     else:
         log.info("Not enough new documents - will catch up with some housekeeping...")
-        
+
         samplePivCountErr = 1
         while samplePivCountErr > pivCountErrTol:
             res = checkPivotCount(collectionName)
             samplePivCountErr = res[1]*res[2]
-        
+
         time.sleep(60)

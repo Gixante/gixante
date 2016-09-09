@@ -5,10 +5,6 @@
 <title>Adlite | Demo for advertisers</title>
 <link href="{{ url_for('static', filename='navbar.css') }}" rel="stylesheet">
 
-{% if APIerror or not APIok %}
-	<meta http-equiv="refresh" content="0;url={{ url_for('api_error', message=APIerror, code=APIcode)}}" />
-{% endif %}
-
 {% endblock %}
 
 {% block body %}

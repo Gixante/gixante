@@ -1,43 +1,115 @@
 # this file contains all functions that need a RabbitMQ connection
 # keep it light! (don't load big files)
 
-import pika, sys, os, re, json
+import pika, sys, re, json
 
-from gixante.utils.parsing import log, domain2coll, domain, cfg
+from gixante.utils.common import log, cfg
+import gixante.utils.parsing
 
-rabbitIP = cfg['rabbitIP']
-urlXchgName = cfg['urlXchgName']
-bufferBlock = cfg['bufferBlock']
+parsing.configForCollection()
+parsing.requiredFields = [ 'URL', 'skinnyURL', 'domain' ]
+basicParser = parsing.Parser()
+
+class RabbitHat:
+    def __init__(self, rmqParams):
+        self.connParams = rmqParams
+        self.exchangeName = cfg['urlXchgName']
+        self._durable = pika.BasicProperties(delivery_mode=2)
+        self._reconnect()
+        
+        # declare the exchange
+        self._publishCh.exchange_declare(exchange=self.exchangeName, exchange_type='direct', durable=True)
+        # declare all queues
+        for coll in set(parsing.domain2coll.values()):
+            self._publishCh.queue_declare(queue=coll, durable=True)
+            self._publishCh.queue_bind(coll, self.exchangeName, routing_key=coll)
+            self._publishCh.queue_declare(queue=coll+'-links', durable=True)
+            self._publishCh.queue_bind(coll+'-links', self.exchangeName, routing_key=coll+'-links')
+    
+    def _reconnect(self):
+        self._connection = pika.BlockingConnection(self.connParams)
+        self._publishCh = self._connection.channel()
+        self._consumeCh = self._connection.channel()
+        
+    def sleep(self, timeSec):
+        self._connection.sleep(timeSec)
+    
+    def _pullAlive(self, direction):
+        assert direction =='publish' or direction=='consume'
+        
+        channelName = "_{0}Ch".format(direction)
+        
+        # make sure the _connection is open
+        try:
+            self._connection.sleep(1e-10)
+            #print('connection was open')
+            assert self.__getattribute__(channelName).is_open
+        
+        except (pika.exceptions.ConnectionClosed, AssertionError) as e:
+            #print('connection / channel was closed')
+            self._reconnect()
+        
+        return(self.__getattribute__(channelName))
+        
+        # now look at the channel
+        if connWasOpen and self.__getattribute__(channelName).is_open:
+            return(self.__getattribute__(channelName))
+        else:
+            self.__setattr__(channelName, self._connection.channel(channel_number=self.__getattribute__(channelName).channel_number))
+            return(self.__getattribute__(channelName))
+    
+    def nInQ(self, Q):
+        return(self._pullAlive('consume').queue_declare(queue=Q, durable=True, passive=True).method.message_count)
+        
+    def declareQ(self, **kwargs):
+        self._pullAlive('publish').queue_declare(**kwrgs)
+    
+    def bindQ(self, **kwargs):
+        self._pullAlive('publish').queue_bind(**kwrgs)
+        
+    def consumeN(self, Q, N):
+        ch = self._pullAlive('consume')
+        
+        out = []
+        
+        while len(out) == 0 or (len(out) < N and method):
+            method, properties, body = ch.basic_get(Q)
+            out.append((method, properties, body))
+        
+        return(out)
+    
+    def multiPublish(self, routing_key, bodies):
+        ch = self._pullAlive('publish')
+        [ ch.basic_publish(exchange=self.exchangeName, routing_key=routing_key, body=body, properties=self._durable) for body in bodies ]
+    
+    def multiAck(self, deliveryTags):
+        ch = self._pullAlive('consume')
+        [ ch.basic_ack(delivery_tag = t) for t in deliveryTags ]
+    
+    def publishLinks(self, links, refURL, routingKeySuffix='-links', linkMaxLegth=250):
+        if not links: return (0, 0)
+        
+        ch = self._pullAlive('publish')
+        
+        # remove quotes; ignore long links
+        nTot = len(links)
+        links = set([ re.sub("'", "%27", l.rstrip('\\')) for l in links ])
+        links = list(links - set([ l for l in links if len(l) > linkMaxLegth ]))
+        
+        docs = [ basicParser.parseDoc({'URL': l}) for l in links ]
+        docs = [ doc for doc in docs if doc['errorCode'] == 'allGood' ]
+        for doc in docs: doc['refURL'] = refURL
+        
+        #using "if 'domain' in doc" will also publish unkown domains
+        bodies = [ json.dumps(doc) for doc in docs ]
+        [ ch.basic_publish(exchange=self.exchangeName, routing_key=parsing.domain2coll[doc['domain']]+routingKeySuffix, body=json.dumps(doc), properties=self._durable) for doc in docs ]
+        nPub = len(bodies)
+        
+        return(nPub, nTot)
 
 # STARTUP
 # connect to RabbitMQ
 log.info("Connecting to RabbitMQ...")
-rmq_credentials = pika.credentials.PlainCredentials(cfg['rabbitUser'], cfg['rabbitPwd'])
-rmq_connection = pika.BlockingConnection(pika.ConnectionParameters(host=rabbitIP, port=5672, credentials=rmq_credentials))
-rabbitConsumeChannel = rmq_connection.channel()
-rabbitPublishChannel = rmq_connection.channel()
-rabbitConsumeChannel.exchange_declare(exchange=urlXchgName, exchange_type='direct', durable=True)
-
-# declare all queues
-for coll in [ coll for coll in set(domain2coll.values()) if coll ]:
-    rabbitConsumeChannel.queue_declare(queue=coll, durable=True)
-    rabbitConsumeChannel.queue_bind(coll, urlXchgName, routing_key=coll)
-    rabbitConsumeChannel.queue_declare(queue=coll+'-links', durable=True)
-    rabbitConsumeChannel.queue_bind(coll+'-links', urlXchgName, routing_key=coll+'-links')
-
-# FUNCTIONS
-def publishLinks(links, routKeySuffix='-links', linkMaxLegth=250):
-    if not links: return None
-    
-    # remove quotes; ignore long links
-    links = set([ re.sub("'", "%27", l.rstrip('\\')) for l in links ])
-    links = list(links - set([ l for l in links if len(l) > linkMaxLegth ]))
-    
-    # which collection should they go to?
-    colls = [ domain2coll[domain(l)] for l in links ]
-    
-    # publish to <collName>-links queue (directly)
-    validLinksColls = [ (c, l) for c, l in zip(colls, links) if c ]
-    log.info("Publishing {0} links...".format(len(validLinksColls)))
-    [ rabbitPublishChannel.basic_publish(exchange=urlXchgName, routing_key=c + routKeySuffix, body=l, properties=pika.BasicProperties(delivery_mode=2)) for c, l in validLinksColls ]
-            
+rmqCredentials = pika.credentials.PlainCredentials(cfg['rabbitUser'], cfg['rabbitPwd'])
+rmqParams = pika.ConnectionParameters(host=cfg['rabbitIP'], port=5672, credentials=rmqCredentials)
+hat = RabbitHat(rmqParams)

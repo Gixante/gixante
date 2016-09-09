@@ -1,0 +1,11 @@
+domain	collection	fields	useForSentences	rssFeeds
+www.theguardian.com/	news	URL,skinnyURL,domain,title,parsedTs,createdTs,body,sentences,contentLength	body	https://www.theguardian.com/uk/rss,https://www.theguardian.com/world/rss
+www.telegraph.co.uk/	news	URL,skinnyURL,domain,title,parsedTs,createdTs,body,sentences,contentLength	body	http://www.telegraph.co.uk/rss.xml
+www.independent.co.uk/	news	URL,skinnyURL,domain,title,parsedTs,createdTs,body,sentences,contentLength	body	http://www.independent.co.uk/news/rss
+www.standard.co.uk/	news	URL,skinnyURL,domain,title,parsedTs,createdTs,body,sentences,contentLength	body	http://www.standard.co.uk/rss
+/www.techcrunch.com/	news	URL,skinnyURL,domain,title,parsedTs,createdTs,body,sentences,contentLength	body	http://feeds.feedburner.com/TechCrunch/
+bbc.co.uk/news	news	URL,skinnyURL,domain,title,parsedTs,createdTs,body,sentences,contentLength	body	http://feeds.bbci.co.uk/news/rss.xml
+bbc.co.uk/food/recipes	recipes	URL,skinnyURL,domain,ampLink,canonicalLink,title,createdTs,parsedTs,links,metas,ingredients,method,sentences,contentLength	method	
+bbc.co.uk/food	otherBBCfood	URL,skinnyURL,domain,ampLink,canonicalLink,title,createdTs,parsedTs,links,metas,ingredientDetails,sentences,contentLength	ingredientDetails	
+bbcgoodfood.com/recipes	recipes	URL,skinnyURL,domain,ampLink,canonicalLink,title,createdTs,parsedTs,links,metas,ingredients,method,sentences,contentLength	method	
+bbcgoodfood.com/	otherBBCfood	URL,skinnyURL,domain,ampLink,canonicalLink,title,createdTs,parsedTs,links,metas,ingredientDetails,sentences,contentLength	ingredientDetails	
