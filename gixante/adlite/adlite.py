@@ -1,7 +1,7 @@
 import sys, time
 from flask import Flask, request, url_for, render_template
 
-import gixante.utils.api
+import gixante.utils.api as api
 api.configForCollection('news')
 
 from gixante.utils.common import log

@@ -3,7 +3,7 @@ import sys, pickle, pika, time, json
 from gixante.utils.rabbit import hat, cfg
 from gixante.utils.common import urlFeat, dodgyFeatures, knownErrors, log, stripURL
 from gixante.utils.arango import addErrors, missing
-from gixante.utils.numpy import log as ln
+from numpy import log as ln
 
 # runtime args
 if len(sys.argv) < 2: sys.argv.append("news")
