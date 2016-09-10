@@ -31,12 +31,13 @@ while True:
             docs.append(doc)
         
         nURLsInQ = hat.nInQ(collectionName)
-        dodgyThreshold = 1 / (1 + ln(1 + buffer[-1][0].message_count / cfg['bufferBlock']))
+        # the model optimal threshold is 0.5 - relax it if the system is not busy
+        dodgyThreshold = max([0.5, 1 / (1 + ln(1 + buffer[-1][0].message_count / cfg['bufferBlock']))])
         log.debug("Dodgy threshold set to {0:.3f}".format(dodgyThreshold))
         
         # run the model to detect dodgy docs
         if dodgyThreshold <= 1:
-            # Only keep URLs below the theshold ( p(dodgy) < threshold )
+            # Only keep URLs if p(dodgy) < dodgyThreshold
             pDodgy = dodgyM.predict_proba(dodgyFeatures(docs, relevTokens))[:,1]
             docs = [ doc for doc, p in zip(docs, pDodgy) if p <= dodgyThreshold ]
             
@@ -49,7 +50,7 @@ while True:
             publishSuffix = '-links'
             waitSec = 60 * len(docs) / cfg['bufferBlock']
             #log.info("Queue '{0}' is juicy; will wait {1:.1f} seconds...".format(collectionName, waitSec))
-            #time.sleep(waitSec)
+            time.sleep(waitSec)
         else:
             publishSuffix = ''
         

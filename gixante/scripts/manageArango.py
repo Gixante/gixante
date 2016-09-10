@@ -1,6 +1,6 @@
 import sys, pickle, time
 
-from gixante.utils.arango import log, getCollection, assignBatchToPartitions, splitPartition, count, checkPivotCount, cfg
+from gixante.utils.arango import log, getCollection, fromNewbies, splitPartition, count, checkPivotCount, cfg
 import gixante.utils.parsing as parsing
 
 # runtime args
@@ -21,6 +21,10 @@ pivCountErrTol = .05
 # load data
 weights, voc, coordModel = pickle.load(open(cfg['dataDir'] + '/forManager.pkl', 'rb'))
 
+# configure parser for validation
+parsing.configForCollection(collectionName)
+parser = parsing.Parser()
+
 ###
 
 # CAUTION: this is NOT threadsafe!
@@ -28,11 +32,11 @@ weights, voc, coordModel = pickle.load(open(cfg['dataDir'] + '/forManager.pkl', 
 while True:
     # assign new docs to partitions
     if count(collectionName + 'Newbies') > batchSize:
-        newCounts = assignBatchToPartitions(partitionQ.format(collectionName, batchSize), voc, weights, collectionName, coordModel)
+        newCounts = fromNewbies("LIMIT {0}".format(batchSize), collectionName, voc, weights, coordModel, parser)
         
         # now iterate over all the fat partitions
         log.info("Splitting large partitions...")
-        [ splitPartition(pid, voc, weights, collectionName, partitionSize) for pid, count in newCounts.items() if count > partitionSize*2 ]
+        [ splitPartition(pid, voc, weights, collectionName, parser, partitionSize) for pid, count in newCounts.items() if count > partitionSize*2 ]
     
     else:
         log.info("Not enough new documents - will catch up with some housekeeping...")

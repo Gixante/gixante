@@ -9,8 +9,7 @@ from scipy.sparse import csr_matrix
 from sklearn.cluster import KMeans
 from sklearn.manifold import TSNE
 from random import sample
-from collections import defaultdict, Counter # Counter is only used for debug
-from lxml import etree # only used if not using rabbit
+from collections import defaultdict, Counter
 
 from gixante.pyrango import Arango
 from gixante.utils.common import log, knownErrors, stripURL, cfg
@@ -256,8 +255,8 @@ def grouper(x):
 
 def scoreBatch(docBatch, voc, weights, scoreType='zscores', verbose=True):
     """
-    Reads a batch of docs (list of deafaultdicts, expecting 'sentences' as a key containing the text)
-    Returns a tuple of lists to be expanded into indices to build sparse matrices
+    Reads a batch of docs (list of dicts, expecting 'sentences' as a key containing the text)
+    Returns an array of embeddings (one per doc)
     Done by sentence
     """
     ct = tqdm if verbose else list
@@ -274,11 +273,11 @@ def scoreBatch(docBatch, voc, weights, scoreType='zscores', verbose=True):
         
         docN += 1
     
-    if len(ixBySentence) == 0: return((docBatch, np.array([]).reshape(0,0)))
+    if len(ixBySentence) == 0: return(np.array([]).reshape(0,0))
     
     # now expand each sentence word by word
     ixByWord = list(zip( *chain( *[ product( *ix ) for ix in ixBySentence ] ) ))
-    if len(ixByWord) == 0: return((docBatch, np.array([]).reshape(0,0)))
+    if len(ixByWord) == 0: return(np.array([]).reshape(0,0))
     
     # create a sparse matrix
     M = csr_matrix( (ixByWord[0], (ixByWord[1], ixByWord[2])), shape=(sentN, len(weights)), dtype=np.float32 )
@@ -307,7 +306,7 @@ def scoreBatch(docBatch, voc, weights, scoreType='zscores', verbose=True):
         log.error("Value '%s' for 'scoreType' not understood." % scoreType)
  
     norms2 = np.sqrt((scoresByDoc**2).sum(axis=1)).reshape(-1,1)
-    return(docBatch, scoresByDoc / norms2)
+    return(scoresByDoc / norms2)
 
 def iterKMeans(X, partitionSize):
     
@@ -331,29 +330,21 @@ def iterKMeans(X, partitionSize):
     
     return(labels, centroids)
 
-def getFastDocs(shortQuery, voc, weights, collectionName, maxNSent=10, scoreType='mean'):
-    """
-    See getCleanDocs, without cleaning and passing some options for speed
-    """
-    log.info("Quickly retrieving documents from %s..." % collectionName)
-    q = shortQuery + " {'_key': doc._key, 'sentences': slice(doc.sentences, 0, %d)}" % maxNSent
-    return(scoreBatch([ defaultdict(list, doc) for doc in database.execute_query(q) ], voc, weights, scoreType=scoreType))
-
-def validate(docs, parser):
+def validate(docs, parser, restrictValidationToFields=None):
     if not parser: return(docs, [])
     
     valid = []
     invalid = []
     
     log.info("Checking for missing fields...")
-    for doc in docs:
-        allValid = all([ f.containsValid(doc) for f in parserfields ])
-        if not allValid:
+    for doc in tqdm(docs):
+        isValid = parser.isValid(doc, restrictValidationToFields)
+        if not isValid:
             # reparse the doc
             doc = parser.strip(parser.parseDoc(doc))
-            allValid = all([ f.containsValid(doc) for f in parserfields ])
+            isValid = parser.isValid(doc, restrictValidationToFields)
         
-        if allValid:
+        if isValid:
             valid.append(doc)
         else:
             invalid.append(doc)
@@ -370,24 +361,29 @@ def getValidDocs(queryFilter, collectionName, returnFields=[], parser=None):
     
     docList = list(database.execute_query(query))
     
-    validDocs, invalid = validate(docList, parser)
+    validDocs, invalid = validate(docList, parser, returnFields)
     
     if invalid:
-        log.debug("Found {0} docs (out of {1}) with missing fields (will re-queue to '{2}' and remove from database)".format(len(invalid), len(docList), collectionName))
-        hat.multiPublish(collectionName, [ json.dumps(doc) for doc in invalid ])
+        qName = re.sub("[A-Z].*", "", collectionName)
+        log.debug("Found {0} docs (out of {1}) with missing fields (will re-queue to '{2}' and remove from database)".format(len(invalid), len(docList), qName))
+        hat.publishLinks([d['URL'] for d in invalid], refURL=None, routingKeySuffix='')
         res = delEverywhere(invalid, collectionName)
 
     return(validDocs)
     
-def cleanScoreDocs(docs, voc, weights):
-        
+def cleanScoreDocs(docs, voc, weights, collectionName):
+    # NOTE: docs need to contain 'URL' and 'sentences' (for scoreBatch)
+    
+    log.debug(Counter([ doc['errorCode'] for doc in docs ]))
     # score 'em all and flag the ones the model cannot understand
-    docs2, vecs = scoreBatch([ doc for doc in docs if doc['errorCode'] == 'allGood' ], voc, weights)
+    docs2 = [ doc for doc in docs if doc.get('errorCode', 'allGood') == 'allGood' ]
+    vecs = scoreBatch(docs2, voc, weights)
     log.info("Flagging incomprehensible documents...")
     naIx = np.isnan(vecs).any(1)
     for doc, isNaN in zip(docs2, naIx):
         if isNaN: doc['errorCode'] = 'cannotUnderstand'
     
+    log.debug(Counter([ doc['errorCode'] for doc in docs ]))
     # find duplicates (in vector space)
     vecs = vecs[ ~naIx, : ]
     docs3 = [ doc for doc in docs2 if doc['errorCode'] == 'allGood' ]
@@ -398,20 +394,13 @@ def cleanScoreDocs(docs, voc, weights):
     allDupes = pd.DataFrame({'origIx': dupeIndices[0], 'dupeIx': dupeIndices[1]})
     # dupeIx is repeated many times (it's transitive!)
     uniDupes = allDupes[ ~np.array(allDupes.duplicated(subset='dupeIx')) ]
-    
     for ix in uniDupes.itertuples(index=False):
         docs3[ix.dupeIx]['errorCode'] = 'duplicated'
         docs3[ix.dupeIx]['dupliURL'] = docs3[ix.origIx]['URL']
     
     log.debug(Counter([ doc['errorCode'] for doc in docs ]))
-        
-    #errorDocs = [ {**doc, **{'skinnyURL': stripURL(doc['URL'])}} for doc in docs if doc['errorCode'] != 'allGood' ]
-    errorDocs = []
-    for doc in docs:
-        if doc['errorCode'] != 'allGood':
-            doc['skinnyURL'] = stripURL(doc['URL'])
-            errorDocs.append(doc)
-    
+    # deal with errors
+    errorDocs = [ doc for doc in docs if doc['errorCode'] != 'allGood' ]
     if len(errorDocs) > 0:
         # remove errors
         res = delEverywhere(errorDocs, collectionName)
@@ -422,6 +411,86 @@ def cleanScoreDocs(docs, voc, weights):
     outZ = list(zip(*[ (doc, vec) for doc, vec in zip(docs2, vecs) if doc['errorCode'] == 'allGood' ]))
     return(list(outZ[0]), np.vstack(outZ[1]))
 
+def fromNewbies(queryFilter, collectionName, voc, weights, coordModel, parser):
+    
+    log.info("Loading documents from {0}Newbies...".format(collectionName))
+    docs, vecs = cleanScoreDocs(getValidDocs(queryFilter, collectionName+'Newbies', returnFields=[], parser=parser), voc, weights, collectionName)
+    
+    if not docs: return({})
+    
+    log.info("Assigning geo index...")
+    xx = coordModel['rfx'].predict(vecs)
+    yy = coordModel['rfy'].predict(vecs)
+    
+    log.info("Getting pivots...")
+    pivotVecs, pivotPartitionIds, pivotCounts = getPivots(collectionName)
+    # find most similar pivot
+    newPids = pivotPartitionIds[ np.argmax(vecs.dot(pivotVecs.T), axis=1) ]
+    modPids = np.unique(newPids)
+    addedPidCounts = np.bincount(modPids)
+    newCounts = dict([ (int(pid), int(pivotCounts[pid] + addedPidCounts[pid])) for pid in modPids ])
+    
+    log.info("Adding documents to {0}...".format(collectionName))
+    for doc, pid, x, y in zip(docs, newPids, xx, yy):
+        doc['partition'] = int(pid)
+        doc['tsne'] = [ x, y ]
+        # remove hidden keys (like primary keys and keys used in parsing)
+        for k in [ key for key in doc.keys() if key.startswith('_') ]:
+            if k in doc: doc.pop(k)
+    
+    res = addDocs(docs, collectionName)
+    res = delDocs(docs, collectionName + 'Newbies')
+        
+    pivotColl = database.col(collectionName + 'Pivots')
+    log.info("Updating pivots in %s..." % pivotColl.name)
+    # NOTE: without checking 'countExact' is faster BUT has concurrency issues!
+    res = [ pivotColl.update_by_example({'partition': pid}, {'nDocs': count}) for pid, count in tqdm(newCounts.items()) ]
+    #countExact = next(database.execute_query("FOR doc IN {0} FILTER doc.partition == {1} COLLECT WITH COUNT INTO c RETURN c".format(collection.name, pid)))
+    
+    return(newCounts)
+
+def splitPartition(partitionId, voc, weights, collectionName, parser=None, partitionSize=250):
+
+    log.info("Splitting partition %d in %s (aiming at partitionSize=%d)..." % (partitionId, collectionName, partitionSize))
+    queryFilter = "FILTER doc.partition == {0}".format(partitionId)
+    returnFields = ['_key', 'URL', 'sentences', 'errorCode']
+    
+    docs, vecs = cleanScoreDocs(getValidDocs(queryFilter, collectionName, returnFields=returnFields, parser=parser), voc, weights, collectionName)
+    
+    if len(docs) < partitionSize*2:
+        log.info("Partition {0} contains {1} docs - no need to split".format(partitionId, len(docs)))
+        database.col(collectionName + 'Pivots').update_by_example({'partition': int(partitionId)}, {'nDocs': len(docs)})
+        return(None)
+    
+    X = TSNE(init='pca', verbose=1, n_components=3).fit_transform(vecs)
+    
+    pivotPartitionIds = getPivotIds(collectionName)
+    newPartitionsIds, centroids = iterKMeans(X, partitionSize)
+    
+    # don't recycle partition ids
+    if len(pivotPartitionIds) > 0:
+        startFrom = pivotPartitionIds.max() + 1
+    else:
+        startFrom = 1
+    
+    # update Arango with the new partitions
+    # TODO: use batches!
+    log.info("Updating documents in %s..." % collectionName)
+    collection = database.col(collectionName)
+    res = [ collection.update_document(docs[k]['_key'], {'partition': int(pid+startFrom)}) for k, pid in tqdm(list(enumerate(newPartitionsIds))) ]
+    
+    # move away old pivot (pivot collection is uniquely indexed on URL)
+    database.execute_query("FOR piv in {0}Pivots FILTER piv.partition == {1} UPDATE piv WITH {{'URL': CONCAT('old-', piv.URL)}} IN {0}Pivots".format(collection.name, partitionId))
+    
+    # create new pivots
+    log.info("Updating pivots in %sPivots..." % collectionName)
+    pivotColl = database.col(collection.name + 'Pivots')
+    res = [ createPivot(docs[cix], vecs[cix,:], pivotColl, int(ix+startFrom), int((newPartitionsIds==ix).sum())) for ix, cix in tqdm(list(enumerate(centroids))) ]
+    
+    # delete old pivot
+    database.execute_query("FOR piv in {0}Pivots FILTER piv.partition == {1} REMOVE piv IN {0}Pivots".format(collection.name, partitionId))
+
+####
 def getCleanDocs(shortQuery, voc, weights, collectionName):
     """
     - Complete and execute an AQL read query
@@ -531,78 +600,3 @@ def getCleanDocs(shortQuery, voc, weights, collectionName):
     vecs = np.vstack(next(outZ))
         
     return(docs, vecs)
-
-def assignBatchToPartitions(shortQuery, voc, weights, collectionName, coordModel):
-    
-    log.info("Assigning documents to partitions:")
-    docs, vecs = getCleanDocs(shortQuery, voc, weights, collectionName)
-    
-    if not docs: return({})
-    
-    log.info("Assigning geo index...")
-    xx = coordModel['rfx'].predict(vecs)
-    yy = coordModel['rfy'].predict(vecs)
-    
-    log.info("Getting pivots...")
-    pivotVecs, pivotPartitionIds, pivotCounts = getPivots(collectionName)
-    # find most similar pivot
-    newPids = pivotPartitionIds[ np.argmax(vecs.dot(pivotVecs.T), axis=1) ]
-    modPids = np.unique(newPids)
-    addedPidCounts = np.bincount(modPids)
-    newCounts = dict([ (int(pid), int(pivotCounts[pid] + addedPidCounts[pid])) for pid in modPids ])
-    
-    log.info("Adding documents to %s..." % collectionName)
-    for doc, pid, x, y in zip(docs, newPids, xx, yy):
-        doc['partition'] = int(pid)
-        doc['tsne'] = [ x, y ]
-    
-    res = addDocs(docs, collectionName)
-    res = delDocs(docs, collectionName + 'Newbies')
-        
-    pivotColl = database.col(collectionName + 'Pivots')
-    log.info("Updating pivots in %s..." % pivotColl.name)
-    # NOTE: without checking 'countExact' is faster BUT has concurrency issues!
-    res = [ pivotColl.update_by_example({'partition': pid}, {'nDocs': count}) for pid, count in tqdm(newCounts.items()) ]
-    #countExact = next(database.execute_query("FOR doc IN {0} FILTER doc.partition == {1} COLLECT WITH COUNT INTO c RETURN c".format(collection.name, pid)))
-    
-    return(newCounts)
-
-def splitPartition(partitionId, voc, weights, collectionName, partitionSize=250):
-
-    log.info("Splitting partition %d in %s (aiming at partitionSize=%d)..." % (partitionId, collectionName, partitionSize))
-    shortQuery = "FOR doc in {0} FILTER doc.partition == {1} RETURN".format(collectionName, partitionId) 
-    
-    docs, vecs = getCleanDocs(shortQuery, voc, weights, collectionName)
-    
-    if len(docs) < partitionSize*2:
-        log.info("Partition {0} contains {1} docs - no need to split".format(partitionId, len(docs)))
-        database.col(collectionName + 'Pivots').update_by_example({'partition': int(partitionId)}, {'nDocs': len(docs)})
-        return(None)
-    
-    X = TSNE(init='pca', verbose=1, n_components=3).fit_transform(vecs)
-    
-    pivotPartitionIds = getPivotIds(collectionName)
-    newPartitionsIds, centroids = iterKMeans(X, partitionSize)
-    
-    # don't recycle partition ids
-    if len(pivotPartitionIds) > 0:
-        startFrom = pivotPartitionIds.max() + 1
-    else:
-        startFrom = 1
-    
-    # update Arango with the new partitions
-    # TODO: use batches!
-    log.info("Updating documents in %s..." % collectionName)
-    collection = database.col(collectionName)
-    res = [ collection.update_document(docs[k]['_key'], {'partition': int(pid+startFrom)}) for k, pid in tqdm(list(enumerate(newPartitionsIds))) ]
-    
-    # move away old pivot (pivot collection is uniquely indexed on URL)
-    database.execute_query("FOR piv in {0}Pivots FILTER piv.partition == {1} UPDATE piv WITH {{'URL': CONCAT('old-', piv.URL)}} IN {0}Pivots".format(collection.name, partitionId))
-    
-    # create new pivots
-    log.info("Updating pivots in %sPivots..." % collectionName)
-    pivotColl = database.col(collection.name + 'Pivots')
-    res = [ createPivot(docs[cix], vecs[cix,:], pivotColl, int(ix+startFrom), int((newPartitionsIds==ix).sum())) for ix, cix in tqdm(list(enumerate(centroids))) ]
-    
-    # delete old pivot
-    database.execute_query("FOR piv in {0}Pivots FILTER piv.partition == {1} REMOVE piv IN {0}Pivots".format(collection.name, partitionId))

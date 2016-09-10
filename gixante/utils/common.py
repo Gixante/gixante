@@ -3,7 +3,7 @@ This module contains all functions used to parse, split etc. (and some config fo
 Keep it light! (don't load big files)
 """
 
-import logging, os, re, sys, json
+import logging, os, re, sys, json, subprocess
 from datetime import datetime as dt
 from pandas import DataFrame, concat
 from numpy import array, where
@@ -17,6 +17,7 @@ log = logging.getLogger("PID:%d" % os.getpid())
 log.setLevel(logging.DEBUG)
 
 # CONFIG
+hostname = subprocess.Popen(["cat", "/etc/hostname"], stdout=subprocess.PIPE).communicate()[0].decode().strip()
 # load config file
 configFile = os.path.join(*(['/'] + __file__.split('/')[:-1] + ['config.json']))
 log.debug("Loading common config from %s..." % configFile)
@@ -155,4 +156,16 @@ def dodgyFeatures(featURLs, relevTokens):
     features = DataFrame(featURLs).loc[ :, staticFeatures ]
     features = concat([ features, binTokens ], axis=1)
     return(features[ staticFeatures + relevTokens ])
+
+def checkTemperature():
+    # to avoid Raspberry Pi burnout
+    if hostname == 'pibuntu':
+        tmp = subprocess.Popen(["vcgencmd", "measure_temp"], stdout=subprocess.PIPE).communicate()
+        temp = float(re.sub("[^0-9\.]*", "", tmp[0].decode()))
+        while temp > 65:
+            log.warning("CPU temperature is {0:.1f} C: will take five!".format(temp))
+            time.sleep(5)
+            tmp = subprocess.Popen(["vcgencmd", "measure_temp"], stdout=subprocess.PIPE).communicate()
+            temp = float(re.sub("[^0-9\.]*", "", tmp[0].decode()))
+
 

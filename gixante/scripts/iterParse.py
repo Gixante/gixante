@@ -1,7 +1,8 @@
-import sys, time, urllib3, certifi, json, subprocess, re
+import sys, time, urllib3, certifi, json
 from tqdm import tqdm
 
-from gixante.utils.rabbit import hat, cfg, log
+from gixante.utils.common import log, checkTemperature, cfg
+from gixante.utils.rabbit import hat
 from gixante.utils.arango import addErrors, addDocs, getRandomLinks, missingFromAll
 import gixante.utils.parsing as parsing
 
@@ -16,19 +17,6 @@ log.info("Starting a HTTP connection...")
 urlPoolMan = urllib3.PoolManager(cert_reqs='CERT_REQUIRED', ca_certs=certifi.where())
 parsing.configForCollection(collectionName)
 parser = parsing.Parser(urlPoolMan)
-hostname = subprocess.Popen(["cat", "/etc/hostname"], stdout=subprocess.PIPE).communicate()[0].decode().strip()
-
-def checkTemperature():
-    
-    # to avoid Raspberry Pi burnout
-    if hostname == 'pibuntu':
-        tmp = subprocess.Popen(["vcgencmd", "measure_temp"], stdout=subprocess.PIPE).communicate()
-        temp = float(re.sub("[^0-9\.]*", "", tmp[0].decode()))
-        while temp > 65:
-            log.warning("CPU temperature is {0:.1f} C: will take five!".format(temp))
-            time.sleep(5)
-            tmp = subprocess.Popen(["vcgencmd", "measure_temp"], stdout=subprocess.PIPE).communicate()
-            temp = float(re.sub("[^0-9\.]*", "", tmp[0].decode()))
 
 ### scrape!
 
@@ -40,7 +28,7 @@ while True:
     if len(buffer) == bufferLength:
         
         nTot = len(buffer)
-        # parse all docs
+        log.info("Downloading and parsing docs...")
         docs = [ parser.strip(parser.parseDoc(json.loads(b.decode()))) for m, d, b in tqdm(buffer) ]
         docs = [ doc for doc in docs if 'URL' in doc ]
         
@@ -49,7 +37,7 @@ while True:
                 
         log.info("Publishing links...")
         linkCounts = []
-        for doc in docs:
+        for doc in tqdm(docs):
             checkTemperature()
             newLinks = [ x[0] for x in missingFromAll(doc.get('links', []), collectionName) ]
             checkTemperature()

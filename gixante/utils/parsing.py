@@ -253,6 +253,12 @@ class Parser:
         strippenda = [ k for k in doc.keys() if re.match(stripRgx, k) ]
         if stripPrivate: strippenda = strippenda + [ k for k in doc.keys() if k.startswith('__') ]
         return(dict([ (k, v) for k, v in doc.items() if k not in strippenda ]))
+    
+    def isValid(self, doc, restrictValidationToFields=None):
+        if not restrictValidationToFields: restrictValidationToFields = self.requiredKeys
+        errorOK = ErrorCode(restrictValidationToFields).containsValid(doc)
+        otherFieldsOK = all([ self.fields[k].containsValid(doc) for k in restrictValidationToFields if k in self.fields ])
+        return(errorOK and otherFieldsOK)
 
 # all the fields ###########################
 class URL(Field):
@@ -337,13 +343,15 @@ class CreatedTs(Field):
     def _add1FromRSS(self, published):
         return(self._rw(recogniseDate(published).timestamp()))
     
-    def _add2Online(self, URL, __headers, __tree):
+    def _add2Online(self, __headers, __tree):
         
         # use the header
         attempts = [ recogniseDate(s) for s in __headers.values() ]
-        attempts = [ a for a in attempts if a ]
-        if len(attempts):
-            return((self._rw(min(attempts).timestamp())))
+        attemptsTs = [ a.timestamp() for a in attempts if a ]
+        # only consider valid if after 1990
+        attemptsTs = [ ats for ats in attemptsTs if ats >= 631152000 ] 
+        if len(attemptsTs):
+            return((self._rw(min(attemptsTs))))
         
         # use the tree
         texts = [ fullText(x) for x in __tree.xpath('//*') ]
