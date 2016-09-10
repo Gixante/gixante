@@ -1,6 +1,7 @@
 import sys, pickle, time
 
 from gixante.utils.arango import log, getCollection, assignBatchToPartitions, splitPartition, count, checkPivotCount, cfg
+import gixante.utils.parsing as parsing
 
 # runtime args
 if len(sys.argv) < 2: sys.argv.append("news")

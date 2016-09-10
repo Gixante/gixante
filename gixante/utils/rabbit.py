@@ -5,6 +5,7 @@ import pika, sys, re, json
 
 from gixante.utils.common import log, cfg
 import gixante.utils.parsing as parsing
+from tqdm import tqdm
 
 parsing.configForCollection()
 parsing.requiredFields = [ 'URL', 'skinnyURL', 'domain' ]
@@ -96,14 +97,13 @@ class RabbitHat:
         links = set([ re.sub("'", "%27", l.rstrip('\\')) for l in links ])
         links = list(links - set([ l for l in links if len(l) > linkMaxLegth ]))
         
-        docs = [ basicParser.parseDoc({'URL': l}) for l in links ]
-        docs = [ doc for doc in docs if doc['errorCode'] == 'allGood' ]
-        for doc in docs: doc['refURL'] = refURL
-        
-        #using "if 'domain' in doc" will also publish unkown domains
-        bodies = [ json.dumps(doc) for doc in docs ]
-        [ ch.basic_publish(exchange=self.exchangeName, routing_key=parsing.domain2coll[doc['domain']]+routingKeySuffix, body=json.dumps(doc), properties=self._durable) for doc in docs ]
-        nPub = len(bodies)
+        nPub = 0
+        for l in tqdm(links):
+            d = basicParser.parseDoc({'URL': l})
+            if d['errorCode'] == 'allGood': # using "if 'domain' in doc" will also publish unkown domains
+                d['refURL'] = refURL
+                ch.basic_publish(exchange=self.exchangeName, routing_key=parsing.domain2coll[d['domain']]+routingKeySuffix, body=json.dumps(d), properties=self._durable)
+                nPub += 1
         
         return(nPub, nTot)
 

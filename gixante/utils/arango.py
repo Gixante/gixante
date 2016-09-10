@@ -15,15 +15,10 @@ from lxml import etree # only used if not using rabbit
 from gixante.pyrango import Arango
 from gixante.utils.common import log, knownErrors, stripURL, cfg
 from gixante.utils.rabbit import hat
-import gixante.utils.parsing as parsing
 
 # STARTUP
 log.info("Connecting to ArangoDB...")
 database = Arango(host=cfg['arangoIP'], port=cfg['arangoPort'], password=cfg['arangoPwd']).db('catapi')
-parsing.configForCollection()
-parser = parsing.Parser()
-# don't touch the URL - it's indexing the collection!
-parser.fields = dict([ (k, f) for k, f in parser.fields.items() if f.name != 'URL' ])
 
 # FUNCTIONS
 # Error handler
@@ -88,6 +83,17 @@ def delErrors(errors, collectionName):
     
     log.info("Deleted {0} errors from '{1}Errors'".format(len(skinnyURLs), collectionName))
     
+    return(res)
+
+def delEverywhere(docs, collectionName):
+    appendices = ['', 'Newbies', 'Errors']
+    collToCheck = [ c for c in [ collectionName + apx for apx in appendices ] if c in database.collections['user'] ]
+    res = []
+    for col in collToCheck:
+        if col.endswith('Errors'):
+            res.extend(delErrors(docs, col))
+        else:
+            res.extend(delDocs(docs, col))
     return(res)
 
 def getRandomLinks(collectionName, nDocs=25):
@@ -333,6 +339,89 @@ def getFastDocs(shortQuery, voc, weights, collectionName, maxNSent=10, scoreType
     q = shortQuery + " {'_key': doc._key, 'sentences': slice(doc.sentences, 0, %d)}" % maxNSent
     return(scoreBatch([ defaultdict(list, doc) for doc in database.execute_query(q) ], voc, weights, scoreType=scoreType))
 
+def validate(docs, parser):
+    if not parser: return(docs, [])
+    
+    valid = []
+    invalid = []
+    
+    log.info("Checking for missing fields...")
+    for doc in docs:
+        allValid = all([ f.containsValid(doc) for f in parserfields ])
+        if not allValid:
+            # reparse the doc
+            doc = parser.strip(parser.parseDoc(doc))
+            allValid = all([ f.containsValid(doc) for f in parserfields ])
+        
+        if allValid:
+            valid.append(doc)
+        else:
+            invalid.append(doc)
+    
+    return(valid, invalid)
+
+def getValidDocs(queryFilter, collectionName, returnFields=[], parser=None):
+    
+    if returnFields:
+        ret = ", ".join([ "'{0}': doc.{0}".format(f) for f in returnFields ])
+        query = "FOR doc in {0} {1} RETURN {{{2}}}".format(collectionName, queryFilter, ret)
+    else:
+        query = "FOR doc in {0} {1} RETURN doc".format(collectionName, queryFilter)
+    
+    docList = list(database.execute_query(query))
+    
+    validDocs, invalid = validate(docList, parser)
+    
+    if invalid:
+        log.debug("Found {0} docs (out of {1}) with missing fields (will re-queue to '{2}' and remove from database)".format(len(invalid), len(docList), collectionName))
+        hat.multiPublish(collectionName, [ json.dumps(doc) for doc in invalid ])
+        res = delEverywhere(invalid, collectionName)
+
+    return(validDocs)
+    
+def cleanScoreDocs(docs, voc, weights):
+        
+    # score 'em all and flag the ones the model cannot understand
+    docs2, vecs = scoreBatch([ doc for doc in docs if doc['errorCode'] == 'allGood' ], voc, weights)
+    log.info("Flagging incomprehensible documents...")
+    naIx = np.isnan(vecs).any(1)
+    for doc, isNaN in zip(docs2, naIx):
+        if isNaN: doc['errorCode'] = 'cannotUnderstand'
+    
+    # find duplicates (in vector space)
+    vecs = vecs[ ~naIx, : ]
+    docs3 = [ doc for doc in docs2 if doc['errorCode'] == 'allGood' ]
+    log.info("Flagging duplicates...")
+    s = vecs.dot(vecs.T) # TODO: just compute the upper tri!
+    dupes = (np.round(np.triu(s,1), decimals=12) == 1)
+    dupeIndices = np.where(dupes)
+    allDupes = pd.DataFrame({'origIx': dupeIndices[0], 'dupeIx': dupeIndices[1]})
+    # dupeIx is repeated many times (it's transitive!)
+    uniDupes = allDupes[ ~np.array(allDupes.duplicated(subset='dupeIx')) ]
+    
+    for ix in uniDupes.itertuples(index=False):
+        docs3[ix.dupeIx]['errorCode'] = 'duplicated'
+        docs3[ix.dupeIx]['dupliURL'] = docs3[ix.origIx]['URL']
+    
+    log.debug(Counter([ doc['errorCode'] for doc in docs ]))
+        
+    #errorDocs = [ {**doc, **{'skinnyURL': stripURL(doc['URL'])}} for doc in docs if doc['errorCode'] != 'allGood' ]
+    errorDocs = []
+    for doc in docs:
+        if doc['errorCode'] != 'allGood':
+            doc['skinnyURL'] = stripURL(doc['URL'])
+            errorDocs.append(doc)
+    
+    if len(errorDocs) > 0:
+        # remove errors
+        res = delEverywhere(errorDocs, collectionName)
+        # add errors to <collectionName>Errors
+        res = addErrors(errorDocs, collectionName)
+        
+    # this is just returning docs, vecs :)
+    outZ = list(zip(*[ (doc, vec) for doc, vec in zip(docs2, vecs) if doc['errorCode'] == 'allGood' ]))
+    return(list(outZ[0]), np.vstack(outZ[1]))
+
 def getCleanDocs(shortQuery, voc, weights, collectionName):
     """
     - Complete and execute an AQL read query
@@ -367,14 +456,14 @@ def getCleanDocs(shortQuery, voc, weights, collectionName):
     query = shortQuery + ' {%s}' % ret
     
     log.info("Carefully retrieving documents...")
-    docList = list(database.execute_query(query))
+    docs = list(database.execute_query(query))
         
     # Integrity checks: add new fields in retKeys and they will be lazily added (without re-downloading the doc) or ...
     log.info("Checking for missing fields...")
     parseAgain = []
-    for ix in range(len(docList)):
-        if not e.containsValid(docList[ix]): docList[ix] = e.update(docList[ix])
-        if docList[ix]['errorCode'] != 'allGood': continue
+    for ix in range(len(docs)):
+        if not e.containsValid(docs[ix]): docs[ix] = e.update(docs[ix])
+        if docs[ix]['errorCode'] != 'allGood': continue
                 
         allValid = all([ parser.fields[k].containsValid(docList[ix]) for k in validableKeys ])
         if not allValid:

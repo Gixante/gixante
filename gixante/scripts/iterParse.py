@@ -1,4 +1,4 @@
-import sys, time, urllib3, certifi, json
+import sys, time, urllib3, certifi, json, subprocess, re
 from tqdm import tqdm
 
 from gixante.utils.rabbit import hat, cfg, log
@@ -16,11 +16,25 @@ log.info("Starting a HTTP connection...")
 urlPoolMan = urllib3.PoolManager(cert_reqs='CERT_REQUIRED', ca_certs=certifi.where())
 parsing.configForCollection(collectionName)
 parser = parsing.Parser(urlPoolMan)
+hostname = subprocess.Popen(["cat", "/etc/hostname"], stdout=subprocess.PIPE).communicate()[0].decode().strip()
+
+def checkTemperature():
+    
+    # to avoid Raspberry Pi burnout
+    if hostname == 'pibuntu':
+        tmp = subprocess.Popen(["vcgencmd", "measure_temp"], stdout=subprocess.PIPE).communicate()
+        temp = float(re.sub("[^0-9\.]*", "", tmp[0].decode()))
+        while temp > 65:
+            log.warning("CPU temperature is {0:.1f} C: will take five!".format(temp))
+            time.sleep(5)
+            tmp = subprocess.Popen(["vcgencmd", "measure_temp"], stdout=subprocess.PIPE).commuicate()
+            temp = float(re.sub("[^0-9\.]*", "", tmp[0].decode()))
 
 ### scrape!
 
 while True:
     
+    checkTemperature()
     buffer = hat.consumeN(collectionName, bufferLength)
         
     if len(buffer) == bufferLength:
@@ -32,16 +46,19 @@ while True:
         
         nValid = len(docs)
         if nValid < nTot: log.warning("WARNING: Found {0} / {1} docs without a valid URL!".format(nTot-nValid, nTot))
-               
-        # add errors to <collectionName>Errors
-        errURLs = set([ err['URL'] for err in addErrors(docs, collectionName) ])
-            
-        # add valid docs to <collectionName>Newbies
-        res = addDocs([ doc for doc in docs if doc['URL'] not in errURLs ], collectionName + 'Newbies')
-            
-        # publish links
-        linkCounts = [ hat.publishLinks([ x[0] for x in missingFromAll(doc.get('links', []), collectionName) ], doc['URL']) for doc in docs ]
+                
+        log.info("Publishing links...")
+        linkCounts = []
+        for doc in docs:
+            checkTemperature()
+            newLinks = [ x[0] for x in missingFromAll(doc.get('links', []), collectionName) ]
+            checkTemperature()
+            linkCounts.append(hat.publishLinks(newLinks, doc['URL']))
+        
         if linkCounts: log.info("Published {0} / {1} new links".format(*[ sum(x) for x in zip(*linkCounts) ]))
+        
+        errURLs = set([ err['URL'] for err in addErrors(docs, collectionName) ])
+        res = addDocs([ doc for doc in docs if doc['URL'] not in errURLs ], collectionName + 'Newbies')
         
         hat.multiAck([ m.delivery_tag for m, d, b in buffer ])
     
@@ -49,56 +66,3 @@ while True:
         log.info("Queue %s is empty - will wait a minute" % collectionName)
         [ hat.publishLinks(x['links'], x['ref']) for x in getRandomLinks(collectionName) ]
         hat.sleep(60)
-
-###
-"""
-### older version
-while True:
-    method, properties, body = rabbitConsumeChannel.basic_get(collectionName)
-    #method, properties, body = rabbitConsumeChannel.basic_get('test')
-    
-    if method:
-        docs.append(body.decode('utf-8'))
-        
-        acks.append(method.delivery_tag)
-    
-        if len(docs) >= bufferLength:
-            
-            # check how many links are in the '-links' queue
-            nLinksInQ = rabbitConsumeChannel.queue_declare(queue=collectionName+'-links', durable=True, passive=True).method.message_count
-            
-            # parse new URLs
-            log.info("Downloading and parsing URLs...")
-            if forceReParse or method.message_count < bufferBlock:
-                # there are not many URLs left; re-parse all the URLs
-                docs = [ parser.parseDoc({'URL': url}) for url in tqdm(URLs) ]
-            else:
-                # there are quite a bit of links left; only parse missing
-                docs = [ parser.parseDoc({'URL': url, 'skinnyURL': skinny}) for url, skinny in tqdm(missingFromAll(URLs, collectionName)) ]
-            
-            
-            # add errors to <collectionName>Errors
-            errURLs = set([ err['URL'] for err in addErrors(docs, collectionName) ])
-            
-            # add valid docs to <collectionName>Newbies
-            res = addDocs([ doc for doc in docs if doc['URL'] not in errURLs ], collectionName + 'Newbies')
-            
-            # publish links
-            links = set([ l for doc in docs if 'links' in doc for l in doc['links'] ])
-            
-            if nLinksInQ > bufferBlock * 10:
-                # the shovel is the bottleneck; filter links to make its life easier
-                
-            
-            # send acks
-            [ rabbitConsumeChannel.basic_ack(delivery_tag = t) for t in acks ]
-            
-            # reset buffers
-            URLs = []
-            acks = []
-    
-    else:
-        log.info("Queue %s is empty - will wait a minute" % collectionName)
-        publishLinks(getRandomLinks(collectionName))
-        time.sleep(60)
-"""
