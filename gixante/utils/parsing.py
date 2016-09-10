@@ -153,7 +153,7 @@ class Parser:
             orderedKeys.extend(nextIterKeys)
             nextIterKeys = [ fn for fn, f in self.fields.items() if fn not in orderedKeys and all([ r in orderedKeys for r in f.requiredKeys() ]) ]
         
-        missingReqKeys = [ r for r in requiredFields if r not in orderedKeys ]
+        missingReqKeys = [ r for r in self.requiredKeys if r not in orderedKeys ]
         if missingReqKeys:
             tryChangingTheseFields = [ f for f in self.fields.values() if f.name not in orderedKeys and len(f._addFunctions) > 1 ]
         else:
@@ -570,9 +570,6 @@ class Headers(Field):
 # The 'add' logic would not work for ErrorCode
 class ErrorCode(Field):
     def __init__(self, shouldHaveFields, otherError=None):
-        
-        global requiredFields
-         
         Field.__init__(self, 'errorCode')
         self.shouldHaveFields = shouldHaveFields
         self.otherError = otherError

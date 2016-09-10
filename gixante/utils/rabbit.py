@@ -79,13 +79,17 @@ class RabbitHat:
         
         return(out)
     
+    def simplePublish(self, routing_key, body):
+        ch = self._pullAlive('publish')
+        return(ch.basic_publish(exchange=self.exchangeName, routing_key=routing_key, body=body, properties=self._durable))
+    
     def multiPublish(self, routing_key, bodies):
         ch = self._pullAlive('publish')
-        [ ch.basic_publish(exchange=self.exchangeName, routing_key=routing_key, body=body, properties=self._durable) for body in bodies ]
+        return([ ch.basic_publish(exchange=self.exchangeName, routing_key=routing_key, body=body, properties=self._durable) for body in bodies ])
     
     def multiAck(self, deliveryTags):
         ch = self._pullAlive('consume')
-        [ ch.basic_ack(delivery_tag = t) for t in deliveryTags ]
+        return([ ch.basic_ack(delivery_tag = t) for t in deliveryTags ])
     
     def publishLinks(self, links, refURL=None, routingKeySuffix='-links', linkMaxLength=250):
         if not links: return (0, 0)
