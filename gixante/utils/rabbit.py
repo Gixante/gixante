@@ -99,7 +99,7 @@ class RabbitHat:
         
         nPub = 0
         for l in tqdm(links):
-            d = basicParse.strip(basicParser.parseDoc({'URL': l}))
+            d = basicParser.strip(basicParser.parseDoc({'URL': l}))
             if d['errorCode'] == 'allGood': # using "if 'domain' in doc" will also publish unkown domains
                 d['refURL'] = refURL
                 nPub += ch.basic_publish(exchange=self.exchangeName, routing_key=parsing.domain2coll[d['domain']]+routingKeySuffix, body=json.dumps(d), properties=self._durable)
