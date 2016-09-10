@@ -87,7 +87,7 @@ class RabbitHat:
         ch = self._pullAlive('consume')
         [ ch.basic_ack(delivery_tag = t) for t in deliveryTags ]
     
-    def publishLinks(self, links, refURL, routingKeySuffix='-links', linkMaxLegth=250):
+    def publishLinks(self, links, refURL, routingKeySuffix='-links', linkMaxLength=250):
         if not links: return (0, 0)
         
         ch = self._pullAlive('publish')
@@ -95,15 +95,14 @@ class RabbitHat:
         # remove quotes; ignore long links
         nTot = len(links)
         links = set([ re.sub("'", "%27", l.rstrip('\\')) for l in links ])
-        links = list(links - set([ l for l in links if len(l) > linkMaxLegth ]))
+        links = list(links - set([ l for l in links if len(l) > linkMaxLength ]))
         
         nPub = 0
         for l in tqdm(links):
-            d = basicParser.parseDoc({'URL': l})
+            d = basicParse.strip(basicParser.parseDoc({'URL': l}))
             if d['errorCode'] == 'allGood': # using "if 'domain' in doc" will also publish unkown domains
                 d['refURL'] = refURL
-                ch.basic_publish(exchange=self.exchangeName, routing_key=parsing.domain2coll[d['domain']]+routingKeySuffix, body=json.dumps(d), properties=self._durable)
-                nPub += 1
+                nPub += ch.basic_publish(exchange=self.exchangeName, routing_key=parsing.domain2coll[d['domain']]+routingKeySuffix, body=json.dumps(d), properties=self._durable)
         
         return(nPub, nTot)
 
