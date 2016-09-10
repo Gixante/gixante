@@ -27,7 +27,7 @@ def checkTemperature():
         while temp > 65:
             log.warning("CPU temperature is {0:.1f} C: will take five!".format(temp))
             time.sleep(5)
-            tmp = subprocess.Popen(["vcgencmd", "measure_temp"], stdout=subprocess.PIPE).commuicate()
+            tmp = subprocess.Popen(["vcgencmd", "measure_temp"], stdout=subprocess.PIPE).communicate()
             temp = float(re.sub("[^0-9\.]*", "", tmp[0].decode()))
 
 ### scrape!
