@@ -138,9 +138,9 @@ def _requestWrap(reqType, url, data=None, **kwargs):
     if heartbeat.isOK():
         try:
             if reqType == 'GET':
-                req = requests.get(url, data=data, **kwargs, timeout=25)
+                req = requests.get(url, data=data, timeout=25, **kwargs)
             elif reqType == 'PUT':
-                req = requests.put(url, data=data, **kwargs, timeout=5)
+                req = requests.put(url, data=data, timeout=5, **kwargs)
             else:
                 raise NotImplementedError("reqType must be one of 'GET' or 'PUT'")
             
