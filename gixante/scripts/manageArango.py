@@ -1,6 +1,6 @@
 import sys, pickle, time
 
-from gixante.utils.arango import log, getCollection, fromNewbies, splitPartition, count, checkPivotCount, cfg
+from gixante.utils.arango import log, getCollection, getValidDocs, fromNewbies, splitPartition, count, checkPivotCount, cfg
 import gixante.utils.parsing as parsing
 
 # runtime args
@@ -49,10 +49,11 @@ while True:
             samplePivCountErr = res[1]*res[2]
         
         # now validate a bunch of docs
+        pids = list(res[0].partition)
         k = 0
-        while time.time()-t0 < 60:
-            pid = [ pid for pid, count in newCounts.items() if count < partitionSize*2 ][k]
-            getValidDocs("FILTER doc.partition == {0}".format(pid), collectionName, returnFields=returnFields, parser=parser)
+        while time.time()-t0 < 60 and k < len(pids):
+            time.sleep(10)
+            pid = pids[k]
+            getValidDocs("FILTER doc.partition == {0}".format(pid), collectionName, returnFields=[], parser=parser)
             k += 1
         
-        time.sleep(60)
