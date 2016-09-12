@@ -407,8 +407,9 @@ def cleanScoreDocs(docs, voc, weights, collectionName):
     # deal with errors
     errorDocs = [ doc for doc in docs if doc['errorCode'] != 'allGood' ]
     if len(errorDocs) > 0:
-        # remove errors
-        res = delEverywhere(errorDocs, collectionName)
+        # remove errors from docs
+        res = delDocs(errorDocs, collectionName)
+        res = delDocs(errorDocs, collectionName+'Newbies')
         # add errors to <collectionName>Errors
         res = addErrors(errorDocs, collectionName)
         
