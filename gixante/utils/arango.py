@@ -371,7 +371,7 @@ def getValidDocs(queryFilter, collectionName, returnFields=[], parser=None):
     if invalid:
         baseQ = re.sub("[A-Z].*", "", collectionName)
         log.debug("Found {0} docs (out of {1}) with missing fields (will re-queue to '{2}' and remove from database)".format(len(invalid), len(docList), baseQ))
-        hat.publishLinks([d['URL'] for d in invalid], refURL=None, routingKeySuffix='')
+        hat.publishLinks([d['URL'] for d in invalid if 'URL' in d], refURL=None, routingKeySuffix='')
         res = delEverywhere(invalid, collectionName)
 
     return(validDocs)
