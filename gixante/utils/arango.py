@@ -351,6 +351,11 @@ def validate(docs, parser, restrictValidationToFields=None):
     
     return(valid, invalid)
 
+def validateNPartitions(collectionName, nPartitions, parser):
+    pids = list(database.execute_query("FOR piv IN {0}Pivots return piv.partition".format(collectionName)))
+    for pid in sample(pids, nPartitions):
+        getValidDocs("FILTER doc.partition == {0}".format(pid), collectionName, returnFields=[], parser=parser)
+
 def getValidDocs(queryFilter, collectionName, returnFields=[], parser=None):
     
     if returnFields:
