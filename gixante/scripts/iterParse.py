@@ -40,7 +40,6 @@ while True:
         for doc in tqdm(docs):
             checkTemperature()
             newLinks = [ x[0] for x in missingFromAll(doc.get('links', []), collectionName) ]
-            checkTemperature()
             linkCounts.append(hat.publishLinks(newLinks, doc['URL']))
         
         if linkCounts: log.info("Published {0} / {1} new links".format(*[ sum(x) for x in zip(*linkCounts) ]))
@@ -52,5 +51,6 @@ while True:
     
     else:
         log.info("Queue %s is empty - will wait a minute" % collectionName)
-        [ hat.publishLinks(x['links'], x['ref']) for x in getRandomLinks(collectionName) ]
-        hat.sleep(60)
+        hat.close()
+        #[ hat.publishLinks(x['links'], x['ref']) for x in getRandomLinks(collectionName) ]
+        time.sleep(60)

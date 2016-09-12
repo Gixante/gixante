@@ -35,9 +35,12 @@ class RabbitHat:
     def sleep(self, timeSec):
         self._connection.sleep(timeSec)
     
+    def close(self):
+        hat._connection.close()
+    
     def _pullAlive(self, direction):
-        assert direction =='publish' or direction=='consume'
         
+        assert direction =='publish' or direction=='consume'
         channelName = "_{0}Ch".format(direction)
         
         # make sure the _connection is open
@@ -72,10 +75,9 @@ class RabbitHat:
         ch = self._pullAlive('consume')
         
         out = []
-        
-        while len(out) == 0 or (len(out) < N and method):
-            method, properties, body = ch.basic_get(Q)
-            out.append((method, properties, body))
+        while len(out) < N:
+            out.append(ch.basic_get(Q))
+            if not out[-1][0]: return(out[:-1])
         
         return(out)
     

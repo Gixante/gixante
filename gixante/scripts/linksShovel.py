@@ -70,10 +70,13 @@ while True:
         hat.multiAck([ m.delivery_tag for m, d, b in buffer ])
     
     else:
-        # links queue is empty: just pass the URLs on to be processed
-        multiPublish(collectionName, [ json.dumps(doc) for doc in docs ])
-        [ rabbitConsumeChannel.basic_ack(delivery_tag = t) for t in acks ]
-        docs = []
-        acks = []
-        log.info("Queue '{0}-links' is empty; will wait a minute...".format(collectionName))
-        rmq_connection.sleep(60)
+        if hat.nInQ(collectionName) < cfg['bufferBlock']:
+            msg = "shovel docs on to '{0}'".format(collectionName)
+            hat.multiPublish(collectionName, [ b for m, d, b in buffer ])
+            hat.multiAck([ m.delivery_tag for m, d, b in buffer ])
+        else:
+            msg = "re-queue docs"
+            hat.close() # this requeues all docs
+        
+        log.info("Queue '{0}-links' is not juicy enough; will {1} and wait a minute...".format(collectionName, msg))
+        time.sleep(60)
