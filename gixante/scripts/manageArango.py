@@ -40,10 +40,19 @@ while True:
     
     else:
         log.info("Not enough new documents - will catch up with some housekeeping...")
-
+        
+        t0 = time.time()
+        
         samplePivCountErr = 1
         while samplePivCountErr > pivCountErrTol:
             res = checkPivotCount(collectionName)
             samplePivCountErr = res[1]*res[2]
-
+        
+        # now validate a bunch of docs
+        k = 0
+        while time.time()-t0 < 60:
+            pid = [ pid for pid, count in newCounts.items() if count < partitionSize*2 ][k]
+            getValidDocs("FILTER doc.partition == {0}".format(pid), collectionName, returnFields=returnFields, parser=parser)
+            k += 1
+        
         time.sleep(60)
