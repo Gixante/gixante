@@ -31,7 +31,8 @@ def lazyMatch(queryId, queryData, nDocs):
     queryData['queryInProgress'] = True
     while len(queryData['docs']) < nDocs:
         q = closestQ.format(queryData['sortedPids'][ queryData['pidN'] ])
-        newDocs, newVecs = scoreBatch(list(database.execute_query(q)), voc, weights, scoreType='mean')
+        newDocs = list(database.execute_query(q))
+        newVecs = scoreBatch(newDocs, voc, weights, scoreType='mean')
         if len(newDocs):
             newDocSimil = newVecs.dot(np.array(queryData['vec']))
             currentSimil = [ doc['similarity'] for doc in queryData['docs'] ]
@@ -123,8 +124,9 @@ class SimilToText(Resource):
         queryData = dict([ (k, v) for k, v in request.form.items() ])
         queryData['docs'] = []
         queryData['nDocs'] = 0
+        print(queryData)
         sentences = classifierSplitter(queryData['text'])
-        rawVec = scoreBatch([ {'sentences': sentences} ], voc, weights, scoreType='mean')[1]
+        rawVec = scoreBatch([ {'sentences': sentences} ], voc, weights, scoreType='mean')
         if len(rawVec) == 0:
             return({'error': "Cannot understand text"})
         else:
@@ -176,7 +178,7 @@ class Semantic(Resource):
         apiColl.update_document(queryId, {'semaSearch': similDocs.get('semaSearch', []) + [semaSearch]})
         
         docs = list(database.execute_query(urlQ.format([ doc['URL'] for doc in similDocs['docs'][:int(rankPctDocs*max(minNumDocs, similDocs['nDocs']))] ])))
-        docs, vecs = scoreBatch(docs, voc, weights)
+        vecs = scoreBatch(docs, voc, weights)
         posVec, negVec, posContext, negContext = contextRank(semaSearch, np.array(similDocs['vec']))
         if len(posContext) > 0:
             posSim = vecs.dot(posVec)
