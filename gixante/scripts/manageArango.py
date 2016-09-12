@@ -13,7 +13,7 @@ partitionSize = int(sys.argv[2])
 batchSize = int(sys.argv[3])
 
 partitionQ = "FOR doc in {0}Newbies LIMIT {1} RETURN"
-pivCountErrTol = .05
+pivCountErrTol = .01
 
 # check indices and other stuff
 #collection = getCollection(collectionName)

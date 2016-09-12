@@ -27,13 +27,11 @@ while True:
         
     if len(buffer) == bufferLength:
         
-        nTot = len(buffer)
         log.info("Downloading and parsing docs...")
         docs = [ parser.strip(parser.parseDoc(json.loads(b.decode()))) for m, d, b in tqdm(buffer) ]
-        docs = [ doc for doc in docs if 'URL' in doc ]
+        docs = [ doc for doc in docs if parser.isValid(doc) ]
         
-        nValid = len(docs)
-        if nValid < nTot: log.warning("WARNING: Found {0} / {1} docs without a valid URL!".format(nTot-nValid, nTot))
+        if len(docs) < bufferLength: log.warning("WARNING: Found {0} / {1} docs without a valid URL!".format(bufferLength-len(docs), bufferLength))
                 
         log.info("Publishing links...")
         linkCounts = []
@@ -44,8 +42,8 @@ while True:
         
         if linkCounts: log.info("Published {0} / {1} new links".format(*[ sum(x) for x in zip(*linkCounts) ]))
         
-        errURLs = set([ err['URL'] for err in addErrors(docs, collectionName) ])
-        res = addDocs([ doc for doc in docs if doc['URL'] not in errURLs ], collectionName + 'Newbies')
+        res = addDocs([ doc for doc in docs if doc['errorCode'] == 'allGood' ], collectionName + 'Newbies')
+        err = addErrors(docs, collectionName)
         
         hat.multiAck([ m.delivery_tag for m, d, b in buffer ])
     

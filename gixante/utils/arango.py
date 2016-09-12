@@ -90,7 +90,7 @@ def delEverywhere(docs, collectionName):
     res = []
     for col in collToCheck:
         if col.endswith('Errors'):
-            res.extend(delErrors(docs, col))
+            res.extend(delErrors(docs, collectionName))
         else:
             res.extend(delDocs(docs, col))
     return(res)
@@ -116,7 +116,7 @@ def exist(what, collRgx, stringIter):
 def missing(what, collRgx, stringIter):
     
     # remove quotes and duplicates
-    strings = set([ re.sub("'", "%27", s.rstrip('\\')) for s in stringIter ])
+    strings = set([ re.sub("'", "%27", s.rstrip('\\')).strip() for s in stringIter ])
     
     collToCheck = [ coll for coll in database.collections['user'] if re.match(collRgx, coll) ]
     existQ = "FOR doc in {{0}} filter doc.{1} in {0} RETURN doc.{1}".format(list(strings), what)
@@ -364,8 +364,8 @@ def getValidDocs(queryFilter, collectionName, returnFields=[], parser=None):
     validDocs, invalid = validate(docList, parser, returnFields)
     
     if invalid:
-        qName = re.sub("[A-Z].*", "", collectionName)
-        log.debug("Found {0} docs (out of {1}) with missing fields (will re-queue to '{2}' and remove from database)".format(len(invalid), len(docList), qName))
+        baseQ = re.sub("[A-Z].*", "", collectionName)
+        log.debug("Found {0} docs (out of {1}) with missing fields (will re-queue to '{2}' and remove from database)".format(len(invalid), len(docList), baseQ))
         hat.publishLinks([d['URL'] for d in invalid], refURL=None, routingKeySuffix='')
         res = delEverywhere(invalid, collectionName)
 
