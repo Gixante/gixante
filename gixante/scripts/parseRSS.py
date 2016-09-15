@@ -67,7 +67,7 @@ while True:
                     
     docLastInQTime = dict([ (url, docLastInQTime.get(url, 0)) for url in urlInRSS ])
     
-    if time.time()-t0 < 60:
+    if time.time()-t0 < 300:
         log.info("Taking a nap...")
-        time.sleep(60 + t0 - time.time())
+        time.sleep(300 + t0 - time.time())
 
