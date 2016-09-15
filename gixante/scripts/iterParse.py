@@ -9,9 +9,11 @@ import gixante.utils.parsing as parsing
 # runtime args
 if len(sys.argv) < 2: sys.argv.append("news")
 if len(sys.argv) < 3: sys.argv.append(int(cfg['bufferBlock']) / 100)
+if len(sys.argv) < 4: sys.argv.append(0)
 
 collectionName = sys.argv[1]
 bufferLength = int(sys.argv[2])
+nRandomDocs = int(sys.argv[3])
 
 log.info("Starting a HTTP connection...")
 urlPoolMan = urllib3.PoolManager(cert_reqs='CERT_REQUIRED', ca_certs=certifi.where())
@@ -31,7 +33,7 @@ while True:
         docs = [ parser.strip(parser.parseDoc(json.loads(b.decode()))) for m, d, b in tqdm(buffer) ]
         docs = [ doc for doc in docs if parser.isValid(doc) ]
         
-        if len(docs) < bufferLength: log.warning("WARNING: Found {0} / {1} docs without a valid URL!".format(bufferLength-len(docs), bufferLength))
+        if len(docs) < len(buffer): log.warning("WARNING: Found {0} / {1} docs without a valid URL!".format(len(buffer)-len(docs), len(buffer)))
                 
         log.info("Publishing links...")
         linkCounts = []
@@ -49,5 +51,5 @@ while True:
     
     else:
         log.info("Queue %s is empty - will wait a minute" % collectionName)
-        [ hat.publishLinks(x['links'], x['ref'], routingKeySuffix='') for x in getRandomLinks(collectionName) ]
+        [ hat.publishLinks(x['links'], x['ref'], routingKeySuffix='') for x in getRandomLinks(collectionName, nRandomDocs) ]
         time.sleep(60)
