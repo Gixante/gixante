@@ -551,7 +551,7 @@ class Tree(Field):
         Field.__init__(self, '__tree')
     
     def _add0(self, URL, __urlPoolMan):
-        return(self._rw(etree.ElementTree(etree.HTML(__urlPoolMan.request('GET', URL).data))))
+        return(self._rw(etree.ElementTree(etree.HTML(__urlPoolMan.request('GET', URL, timeout=5).data))))
     
     def isValid(self, what):
         return(type(what) is etree._ElementTree and len(what.xpath('//*/text()')) > 0)
@@ -561,7 +561,7 @@ class Headers(Field):
         Field.__init__(self, '__headers')
     
     def _add0(self, URL, __urlPoolMan):
-        return(self._rw(dict(__urlPoolMan.request('HEAD', URL).getheaders())))
+        return(self._rw(dict(__urlPoolMan.request('HEAD', URL, timeout=5).getheaders())))
     
     def isValid(self, what):
         return(type(what) is dict and len(what) > 0)
