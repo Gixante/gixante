@@ -40,6 +40,7 @@ while True:
         for doc in tqdm(docs):
             checkTemperature()
             newLinks = [ x[0] for x in missingFromAll(doc.get('links', []), collectionName) ]
+            print([ l for l in newLinks if 'reuters' in l ])
             linkCounts.append(hat.publishLinks(newLinks, doc['URL']))
         
         if linkCounts: log.info("Published {0} / {1} new links".format(*[ sum(x) for x in zip(*linkCounts) ]))

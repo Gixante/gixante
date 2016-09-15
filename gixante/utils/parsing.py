@@ -455,7 +455,8 @@ class FatPeas(Field):
     
     def _ppt(self, __tree):
         peas = [ p for p in __tree.xpath('//p') ]
-        paths = [ re.sub('\[[0-9]*\]|/p.*$', '', __tree.getpath(p)) for p in peas ]
+        # remove occurrence index (like /div[0]) and trailing /span
+        paths = [ re.sub('(/span)+$', '', re.sub('\[[0-9]*\]|/p.*$', '', __tree.getpath(p))) for p in peas ]
         texts = [ fullText(p) for p in peas ]
         return(peas, paths, texts)
             
