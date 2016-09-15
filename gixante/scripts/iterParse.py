@@ -25,7 +25,7 @@ while True:
     checkTemperature()
     buffer = hat.consumeN(collectionName, bufferLength)
         
-    if len(buffer) == bufferLength:
+    if len(buffer) > 0:
         
         log.info("Downloading and parsing docs...")
         docs = [ parser.strip(parser.parseDoc(json.loads(b.decode()))) for m, d, b in tqdm(buffer) ]
@@ -49,6 +49,5 @@ while True:
     
     else:
         log.info("Queue %s is empty - will wait a minute" % collectionName)
-        hat.close()
-        #[ hat.publishLinks(x['links'], x['ref']) for x in getRandomLinks(collectionName) ]
+        [ hat.publishLinks(x['links'], x['ref'], routingKeySuffix='') for x in getRandomLinks(collectionName) ]
         time.sleep(60)
