@@ -33,7 +33,6 @@ while True:
     
     for domain in feedUrls.keys():
         for url in feedUrls[domain]:
-            print(url)
             p = rssParse(url)
             
             for doc in p.entries:
@@ -61,7 +60,7 @@ while True:
                     doc = dict([ (k, v) for k, v in doc.items() if k in usefulKeys ])
                     doc = parser.strip(parser.parseDoc(doc), stripRgx, stripPrivate=False)
                     if doc['errorCode'] == 'allGood':
-                        #log.info("New version of {0} by {1} seconds".format(doc['URL'], refTs - docLastInQTime.get(doc['URL'], 0)))
+                        log.info("New version of {0} by {1} seconds".format(doc['URL'], refTs - docLastInQTime.get(doc['URL'], 0)))
                         hat.simplePublish(collectionName, json.dumps(doc))
                         docLastInQTime[doc['URL']] = refTs
                     
