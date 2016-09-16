@@ -23,7 +23,7 @@ while True:
     
     buffer = hat.consumeN(collectionName+'-links', cfg['bufferBlock'])
     
-    if len(buffer) == cfg['bufferBlock']:
+    if hat.nInQ(collectionName) > cfg['bufferBlock']: # enough links, filter these ones
         docs = []
         for m, d, b in buffer:
             doc = json.loads(b.decode('utf-8'))
@@ -39,7 +39,7 @@ while True:
         if dodgyThreshold <= 1:
             # Only keep URLs if p(dodgy) < dodgyThreshold
             pDodgy = dodgyM.predict_proba(dodgyFeatures(docs, relevTokens))[:,1]
-            docs = [ doc for doc, p in zip(docs, pDodgy) if p <= dodgyThreshold ]
+            docs = [ doc for doc, p in zip(docs, pDodgy) if p <= dodgyThreshold or 'reuters' in doc['URL'].lower() ] # PATCH: model not configured for reuters yet
             
         if addDodgiesToErrors: # slower but useful for model performance debugging
             dodgyDocs = [ {**doc, **{'errorCode': 'dodgy'}} for doc, p in zip(docs, pDodgy) if p >= dodgyThreshold ]
@@ -70,13 +70,11 @@ while True:
         hat.multiAck([ m.delivery_tag for m, d, b in buffer ])
     
     else:
-        if hat.nInQ(collectionName) < cfg['bufferBlock']:
-            msg = "shovel docs on to '{0}'".format(collectionName)
-            hat.multiPublish(collectionName, [ b for m, d, b in buffer ])
-            hat.multiAck([ m.delivery_tag for m, d, b in buffer ])
-        else:
-            msg = "re-queue docs"
-            hat.close() # this requeues all docs
-        
-        log.info("Queue '{0}-links' is not juicy enough; will {1} and wait a minute...".format(collectionName, msg))
+        log.info("Queue '{0}' is not juicy enough; will shovel {1:,} links directly in there".format(collectionName, len(buffer)))
+        hat.multiPublish(collectionName, [ b for m, d, b in buffer ])
+        hat.multiAck([ m.delivery_tag for m, d, b in buffer ])
+    
+    if len(buffer) < cfg['bufferBlock']:
+        log.info("Queue '{0}-links' is not juicy enough; will wait a minute".format(collectionName))
+        hat.close()
         time.sleep(60)
