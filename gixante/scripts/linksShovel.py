@@ -43,7 +43,8 @@ while True:
             pDodgy = dodgyM.predict_proba(dodgyFeatures(allDocs, relevTokens))[:,1]
             docs = [ doc for doc, p in zip(allDocs, pDodgy) if p <= dodgyThreshold or 'reuters' in doc['URL'] or 'bbc' in doc['URL'] ] # PATCH: model not trained on reuters yet
         
-        log.debug("Dodgy docs breakdown: {0}".format(dict(Counter([ doc.get('domain', None) for doc, p in zip(allDocs, pDodgy) if p >= dodgyThreshold ]))))
+        nonDodgyURLs = set([ doc['URL'] for doc in docs ])
+        log.debug("Dodgy docs breakdown: {0}".format(dict(Counter([ doc.get('domain', None) for doc in allDocs if doc['URL'] not in nonDodgyURLs ]))))
                             
         if nURLsInQ > maxLinksInQ:
             # collection q is juicy; re-deliver to -links and wait a bit (not to saturate the CPU)
