@@ -4,13 +4,13 @@ from gixante.utils.rabbit import hat, cfg
 from gixante.utils.common import urlFeat, dodgyFeatures, knownErrors, log, stripURL
 from gixante.utils.arango import addErrors, missing
 from numpy import log as ln
+from collections import Counter
 
 # runtime args
 if len(sys.argv) < 2: sys.argv.append("news")
 
 collectionName = sys.argv[1]
 maxLinksInQ = cfg['bufferBlock']
-addDodgiesToErrors = False
 
 # CONFIG
 dodgyDir = '/home/bean/dodgyModel/'
@@ -24,11 +24,13 @@ while True:
     buffer = hat.consumeN(collectionName+'-links', cfg['bufferBlock'])
     
     if hat.nInQ(collectionName) > cfg['bufferBlock']: # enough links, filter these ones
-        docs = []
+        allDocs = []
         for m, d, b in buffer:
             doc = json.loads(b.decode('utf-8'))
             doc.update(urlFeat(doc['URL']))
-            docs.append(doc)
+            allDocs.append(doc)
+        
+        log.debug("Raw docs breakdown: {0}".format(dict(Counter([ doc.get('domain', None) for doc in allDocs ]))))
         
         nURLsInQ = hat.nInQ(collectionName)
         # the model optimal threshold is 0.5 - relax it if the system is not busy
@@ -38,13 +40,11 @@ while True:
         # run the model to detect dodgy docs
         if dodgyThreshold <= 1:
             # Only keep URLs if p(dodgy) < dodgyThreshold
-            pDodgy = dodgyM.predict_proba(dodgyFeatures(docs, relevTokens))[:,1]
-            docs = [ doc for doc, p in zip(docs, pDodgy) if p <= dodgyThreshold or 'reuters' in doc['URL'].lower() ] # PATCH: model not configured for reuters yet
-            
-        if addDodgiesToErrors: # slower but useful for model performance debugging
-            dodgyDocs = [ {**doc, **{'errorCode': 'dodgy'}} for doc, p in zip(docs, pDodgy) if p >= dodgyThreshold ]
-            addErrors(dodgyDocs, collectionName)
-                    
+            pDodgy = dodgyM.predict_proba(dodgyFeatures(allDocs, relevTokens))[:,1]
+            docs = [ doc for doc, p in zip(allDocs, pDodgy) if p <= dodgyThreshold or 'reuters' in doc['URL'] or 'bbc' in doc['URL'] ] # PATCH: model not trained on reuters yet
+        
+        log.debug("Dodgy docs breakdown: {0}".format(dict(Counter([ doc.get('domain', None) for doc, p in zip(allDocs, pDodgy) if p >= dodgyThreshold ]))))
+                            
         if nURLsInQ > maxLinksInQ:
             # collection q is juicy; re-deliver to -links and wait a bit (not to saturate the CPU)
             publishSuffix = '-links'
