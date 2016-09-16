@@ -592,6 +592,7 @@ class ErrorCode(Field):
             if 'urllib3' in str(self.otherError):
                 doc['errorCode'] = 'cannotDownload'
             else:
+                log.debug(doc['URL'])
                 doc['errorCode'] = 'parsingError'
             return(doc)
         

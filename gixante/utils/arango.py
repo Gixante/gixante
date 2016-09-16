@@ -119,10 +119,11 @@ def missing(what, collRgx, stringIter):
     strings = set([ re.sub("'", "%27", s.rstrip('\\')).strip() for s in stringIter ])
     
     collToCheck = [ coll for coll in database.collections['user'] if re.match(collRgx, coll) ]
-    existQ = "FOR doc in {{0}} filter doc.{1} in {0} RETURN doc.{1}".format(list(strings), what)
+    # don't use .format: curly brackets mess it up!
+    existQ = " FILTER doc.{1} in {0} RETURN doc.{1}".format(list(strings), what)
     
     for coll in collToCheck:
-        strings = strings.difference(set(database.execute_query(existQ.format(coll))))
+        strings = strings.difference(set(database.execute_query("FOR doc in "+coll+existQ)))
     
     return(strings)
     
