@@ -1,4 +1,4 @@
-import sys, time
+import sys, time, re
 from flask import Flask, request, url_for, render_template
 
 import gixante.utils.api as api
@@ -76,7 +76,13 @@ def ad_initial():
 @app.route('/ad_fetch/<queryId>/<int:nMoreDocs>')
 def ad_fetch(queryId, nMoreDocs=nGet):
     out = api.get('get/id={0}/fields=text,queryInProgress,nDocs,_key/minNumDocs={1}/nMoreDocs={2}/docFields=URL,title'.format(queryId, nReturnDocs, nMoreDocs))
-    if 'docs' in out: out['docs'] = out['docs'][:nReturnDocs]
+    if 'docs' in out:
+        out['docs'] = out['docs'][:nReturnDocs]
+        for doc in out['docs']:
+            if not doc['URL'].startswith('http'):
+                doc['URL'] = 'http://'+doc['URL']
+    
+    print([ d['URL'] for d in out['docs'] ])
     return(render_template('ad_results.html', **out))
     
 @app.route('/ad_semantic_intro/<queryId>', methods=['POST', 'GET'])

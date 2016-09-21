@@ -22,8 +22,9 @@ dodgyM, relevTokens = pickle.load(open(dodgyDir + '/model.pkl', 'rb'))
 while True:
     
     buffer = hat.consumeN(collectionName+'-links', cfg['bufferBlock'])
+    nURLsInQ = hat.nInQ(collectionName)
     
-    if hat.nInQ(collectionName) > cfg['bufferBlock']: # enough links, filter these ones
+    if nURLsInQ > cfg['bufferBlock']: # enough links, filter these ones
         allDocs = []
         for m, d, b in buffer:
             doc = json.loads(b.decode('utf-8'))
@@ -32,7 +33,6 @@ while True:
         
         log.debug("Raw docs breakdown: {0}".format(dict(Counter([ doc.get('domain', None) for doc in allDocs ]))))
         
-        nURLsInQ = hat.nInQ(collectionName)
         # the model optimal threshold is 0.5 - relax it if the system is not busy
         dodgyThreshold = max([0.5, 1 / (1 + ln(1 + buffer[-1][0].message_count / cfg['bufferBlock']))])
         log.debug("Dodgy threshold set to {0:.3f}".format(dodgyThreshold))
@@ -55,14 +55,11 @@ while True:
         else:
             publishSuffix = ''
         
-        if nURLsInQ > 0:
-            # check if URLs are in the collection
-            nonErrorSkinnies = missing('skinnyURL', '^%sErrors$' % collectionName, [ doc['skinnyURL'] for doc in docs ])
-            notExistURLs = missing('URL', '^{0}$|^{0}Newbies$'.format(collectionName), [ doc['URL'] for doc in docs ])
-            validDocs = [ doc for doc in docs if doc['URL'] in notExistURLs and doc['skinnyURL'] in nonErrorSkinnies ]
-        else:
-            validDocs = [ doc for doc in docs ]
-        
+        # check if URLs are in the collection
+        nonErrorSkinnies = missing('skinnyURL', '^%sErrors$' % collectionName, [ doc['skinnyURL'] for doc in docs ])
+        notExistURLs = missing('URL', '^{0}$|^{0}Newbies$'.format(collectionName), [ doc['URL'] for doc in docs ])
+        validDocs = [ doc for doc in docs if doc['URL'] in notExistURLs and doc['skinnyURL'] in nonErrorSkinnies ]
+                
         # publish the other ones to publishQ
         log.info("Publishing {0} docs to '{1}{2}'...".format(len(validDocs), collectionName, publishSuffix))
         hat.multiPublish(collectionName+publishSuffix, [ json.dumps(doc) for doc in validDocs ])
