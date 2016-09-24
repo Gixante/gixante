@@ -10,7 +10,6 @@ from collections import Counter
 if len(sys.argv) < 2: sys.argv.append("news")
 
 collectionName = sys.argv[1]
-maxLinksInQ = cfg['bufferBlock']
 
 # CONFIG
 dodgyDir = '/home/bean/dodgyModel/'
@@ -46,7 +45,7 @@ while True:
         nonDodgyURLs = set([ doc['URL'] for doc in docs ])
         log.debug("Dodgy docs breakdown: {0}".format(dict(Counter([ doc.get('domain', None) for doc in allDocs if doc['URL'] not in nonDodgyURLs ]))))
                             
-        if nURLsInQ > maxLinksInQ:
+        if nURLsInQ > 2*cfg['bufferBlock']:
             # collection q is juicy; re-deliver to -links and wait a bit (not to saturate the CPU)
             publishSuffix = '-links'
             waitSec = 60 * len(docs) / cfg['bufferBlock']
