@@ -11,7 +11,7 @@
   <div class="jumbotron">
 	<h1>For advertisers</h1>
 	<p>Adlite is about content-based ads. It is a new way to promote branded content across multiple publishers, merging the quality of sponsored content with the reach of display advertising.</p>
-	{% if APIok %}
+	{% if APIok() %}
 		<div style="float: left; padding: 5px;"><p><a class="btn btn-primary btn-lg" href="{{ url_for('ad_demo') }}" role="button">Try the online demo now</a></p></div>
 	{% endif %}
 	<div style="float: left; padding: 5px;"><p><a class="btn btn-primary btn-lg" href="{{ url_for('contact') }}"  role="button">Request a full demo &raquo;</a></p></div>

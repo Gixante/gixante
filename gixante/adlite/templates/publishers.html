@@ -11,7 +11,7 @@
   <div class="jumbotron">
 	<h1>For publishers</h1>
 	<p>We have created a new channel for brands to promote high quality content on your pages. We have designed Adlite so you are in control of your inventory and make sure it gets the right price. </p>
-	{% if APIok %}
+	{% if APIok() %}
 		<div style="float: left; padding: 5px;"><p><a class="btn btn-primary btn-lg" href="{{ url_for('ad_demo') }}" role="button">Try the online demo now</a></p></div>
 	{% endif %}
 	<div style="float: left; padding: 5px;"><p><a class="btn btn-primary btn-lg" href="{{ url_for('contact') }}"  role="button">Request a full demo &raquo;</a></p></div>

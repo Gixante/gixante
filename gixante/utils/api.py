@@ -85,32 +85,32 @@ class Heartbeat:
         
         self.updateTs = time.time()
         
-        for timeout in [ 0.01, 0.05, 0.1 ]:
-            try:
-                hbRes = requests.get(self.hbURL, timeout=timeout)
-                self._status = "alive (timeout={0})".format(timeout)
-                self.httpCode = hbRes.status_code
-                if self.httpCode == 200:
-                    hbDict = hbRes.json() 
-                    hbGuess = [ v for k,v in hbDict.items() if 'beat' in k.lower() and type(v) is float ]
-                    if hbGuess:
-                        self.beatTs = min(hbGuess)
-                        self.error = None
-                    else:
-                        raise RuntimeError("No valid field containing a timestamp found at {0}".format(self.hbURL))
+        try:
+            t0 = time.time()
+            hbRes = requests.get(self.hbURL, timeout=10)
+            self._status = "alive (timeout = {0:.2f} ms)".format(1000* (time.time()-t0))
+            self.httpCode = hbRes.status_code
+            if self.httpCode == 200:
+                hbDict = hbRes.json() 
+                hbGuess = [ v for k,v in hbDict.items() if 'beat' in k.lower() and type(v) is float ]
+                if hbGuess:
+                    self.beatTs = min(hbGuess)
+                    self.error = None
                 else:
-                    hbDict = {}
-                    self.error = "API internal error"
-                
-                return(hbDict)
+                    raise RuntimeError("No valid field containing a timestamp found at {0}".format(self.hbURL))
+            else:
+                hbDict = {}
+                self.error = "API internal error"
             
-            except requests.exceptions.Timeout as te:
-                self._status = "unknown (timed out)"
-                self.httpCode = 408
-            except:
-                self.error = sys.exc_info().__str__()
-                self._status = 'dead'
-                self.httpCode = 404
+            return(hbDict)
+        
+        except requests.exceptions.Timeout as te:
+            self._status = "unknown (timed out)"
+            self.httpCode = 408
+        except:
+            self.error = sys.exc_info().__str__()
+            self._status = 'dead'
+            self.httpCode = 404
         
         return({})
     
@@ -122,7 +122,7 @@ class Heartbeat:
             tmp = self.fetch()
             return(self.status(maxRetries=(maxRetries-1)))
         else:
-            return("Maximim number of retries exceeded; last status available is {0}".format(self._status))
+            return("Maximum number of retries exceeded; last status available is {0}".format(self._status))
             
     # one for jinja
     def isOK(self):

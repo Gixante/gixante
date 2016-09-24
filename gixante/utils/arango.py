@@ -372,8 +372,15 @@ def getValidDocs(queryFilter, collectionName, returnFields=[], parser=None):
     if invalid:
         baseQ = re.sub("[A-Z].*", "", collectionName)
         log.debug("Found {0} docs (out of {1}) with missing fields (will re-queue to '{2}' and remove from database)".format(len(invalid), len(docList), baseQ))
-        usableDocs = [d for d in invalid if 'URL' in d] # if there's no URL, ignore it
-        hat.publishLinks([d['URL'] for d in usableDocs], refURL=None, routingKeySuffix='')
+        
+        usableDocs = []
+        for doc_ in invalid:
+            if 'URL' in doc_:
+                usableDocs.append({'URL': doc_['URL']})
+                for f in ['skinnyURL', 'domain', 'refURL']:
+                    if f in doc_: usableDocs[-1][f] = doc_[f]
+        
+        hat.multiPublish(baseQ, [json.dumps(d) for d in usableDocs])
         res = delEverywhere([d for d in usableDocs], collectionName)
 
     return(validDocs)

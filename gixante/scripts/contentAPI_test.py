@@ -10,7 +10,7 @@ if len(sys.argv) < 4: sys.argv.append("20") # INFO logging level
 site = sys.argv[2]
 log.setLevel(int(sys.argv[3]))
 api.configForCollection(sys.argv[1])
-api.rootUrl = 'http://localhost:9999'
+#api.rootUrl = 'http://localhost:9999'
 
 log.info("Testing resource 'Statistics'...")
 testStatsGet = api.get('getCollStats')
