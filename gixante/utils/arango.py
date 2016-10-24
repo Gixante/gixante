@@ -116,7 +116,7 @@ def exist(what, collRgx, stringIter):
 def missing(what, collRgx, stringIter):
     
     # remove quotes and duplicates
-    strings = [ re.sub("'", "%27", s.rstrip('\\')) for s in stringIter if len(re.findall('{|}', s)) == 0 ]
+    strings = set([ re.sub("'", "%27", s.rstrip('\\')) for s in stringIter if len(re.findall('{|}', s)) == 0 ])
     
     collToCheck = [ coll for coll in database.collections['user'] if re.match(collRgx, coll) ]
     # don't use .format: curly brackets mess it up!
