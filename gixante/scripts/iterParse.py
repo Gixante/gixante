@@ -43,7 +43,6 @@ while True:
         
         linksByCollection = defaultdict(list)
         for doc in docs:
-            checkTemperature()
             for l in doc.get('links', []):
                 if l in newSkinnies:
                     linkDoc = dom.add({'URL': l, 'refURL': doc['URL'], 'skinnyURL': newSkinnies[l]})[0]
