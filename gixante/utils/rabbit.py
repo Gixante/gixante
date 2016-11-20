@@ -21,7 +21,7 @@ class RabbitHat:
         # declare the exchange
         self._publishCh.exchange_declare(exchange=self.exchangeName, exchange_type='direct', durable=True)
         # declare all queues
-        for coll in set(parsing.domain2coll.values()):
+        for coll in set(parsing.url2coll.values()):
             self._publishCh.queue_declare(queue=coll, durable=True)
             self._publishCh.queue_bind(coll, self.exchangeName, routing_key=coll)
             self._publishCh.queue_declare(queue=coll+'-links', durable=True)

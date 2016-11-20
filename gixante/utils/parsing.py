@@ -6,22 +6,24 @@ from lxml import etree
 from collections import defaultdict, Counter
 from Levenshtein import distance
 
-from gixante.utils.common import log, classifierSplitter, recogniseDate, cleanText, stripURL, knownErrors
+from gixante.utils.common import log, classifierSplitter, recogniseDate, cleanText, stripURL, knownErrors, RgxDict
 
 # load config file
 configFile = os.path.join(*(['/'] + __file__.split('/')[:-1] + ['scraperConfig.tsv']))
 log.debug("Loading scraping config from %s..." % configFile)
 
 # configure module
-global domains, useForSentences, splitter, requiredFields, domain2coll
+global url2domain, useForSentences, splitter, requiredFields, url2coll
 
 def configForCollection(collectionName=None, _requiredFields='setFromCollection'):
-    global domains, useForSentences, splitter, requiredFields, domain2coll
+    global url2domain, useForSentences, splitter, requiredFields, url2coll
     
     splitter = classifierSplitter
-    parserConfig = parserConfig = pd.read_csv(configFile, sep='\t', header=0)
-    domain2coll = dict(zip(parserConfig.domain, parserConfig.collection))
-    domains = list(parserConfig.domain)
+    parserConfig = pd.read_csv(configFile, sep='\t', header=0)
+    url2coll = RgxDict(parserConfig[['domainRegex', 'collection']].itertuples(index=False))
+    url2domain = RgxDict(parserConfig[['domainRegex', 'domain']].itertuples(index=False))
+    #url2coll = dict(zip(parserConfig.domain, parserConfig.collection))
+    #domains = list(parserConfig.domain)
     
     if collectionName:
         parserConfig = parserConfig.loc[ parserConfig.collection == collectionName, : ]
@@ -297,13 +299,15 @@ class SkinnyURL(Field):
 class Domain(Field):
     def __init__(self):
         Field.__init__(self, 'domain')
-        self.domains = domains
+        #self.domains = domains
     
     def _add0(self, URL):
-        checkThis = re.sub('[^A-Za-z0-9_.~\-/:].*', '', URL)
-        for dom in self.domains:
-            if dom in checkThis:
-                return(self._rw(dom))
+        dom = url2domain[URL]
+        return(self._rw(dom[0] if dom else None))
+        # checkThis = re.sub('[^A-Za-z0-9_.~\-/:].*', '', URL)
+        # for dom in self.domains:
+        #     if dom in checkThis:
+        #         return(self._rw(dom))
 
     def isValid(self, what):
         return(type(what) is str and len(what) > 0 and what != 'unknown')

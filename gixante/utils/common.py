@@ -38,6 +38,10 @@ knownErrors = {
     'cannotDownload'  : 'it could not be downloaded',
     'unknownDomain'   : 'its domain was not recognised',
     }
+# CLASSES
+class RgxDict(OrderedDict):
+    def __getitem__(self, string):
+        return([v for k, v in self.items() if re.match(k, string)])
 
 # FUNCTIONS
 # keep some diacriticals
