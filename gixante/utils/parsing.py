@@ -21,6 +21,7 @@ def configForCollection(collectionName=None, _requiredFields='setFromCollection'
     splitter = classifierSplitter
     parserConfig = parserConfig = pd.read_csv(configFile, sep='\t', header=0)
     domain2coll = dict(zip(parserConfig.domain, parserConfig.collection))
+    domains = list(parserConfig.domain)
     
     if collectionName:
         parserConfig = parserConfig.loc[ parserConfig.collection == collectionName, : ]
@@ -32,8 +33,7 @@ def configForCollection(collectionName=None, _requiredFields='setFromCollection'
     else:
         defaultRequiredFields = []
         useForSentences = None
-        
-    domains = list(parserConfig.domain)
+    
     requiredFields = _requiredFields if type(_requiredFields) is list else defaultRequiredFields
 
 # FUNCTIONS

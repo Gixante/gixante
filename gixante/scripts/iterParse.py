@@ -17,7 +17,7 @@ bufferLength = int(sys.argv[2])
 nRandomDocs = int(sys.argv[3])
 
 log.info("Starting a HTTP connection...")
-urlPoolMan = urllib3.PoolManager(cert_reqs='CERT_REQUIRED', ca_certs=certifi.where(), headers={'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/52.0.2743.116 Safari/537.36'})
+urlPoolMan = urllib3.PoolManager(cert_reqs='CERT_REQUIRED', ca_certs=certifi.where())  #, headers={'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/52.0.2743.116 Safari/537.36'})
 parsing.configForCollection(collectionName)
 parser = parsing.Parser(urlPoolMan)
 dom = parsing.Domain()
