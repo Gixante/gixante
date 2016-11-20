@@ -52,4 +52,4 @@ while True:
         validateNPartitions(collectionName, 1, parser)
         
         # take a nap
-        time.sleep(60)        
+        time.sleep(300)        

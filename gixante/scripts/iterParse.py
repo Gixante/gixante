@@ -43,13 +43,14 @@ while True:
         
         linksByCollection = defaultdict(list)
         for doc in docs:
+            checkTemperature()
             for l in doc.get('links', []):
                 if l in newSkinnies:
                     linkDoc = dom.add({'URL': l, 'refURL': doc['URL'], 'skinnyURL': newSkinnies[l]})[0]
                     linksByCollection[ parsing.domain2coll[linkDoc['domain']] ].append(json.dumps(linkDoc))
                     newSkinnies.pop(l)
         
-        res = dict([ (routingKey, sum(hat.multiPublish(routingKey, bodies))) for routingKey, bodies in linksByCollection.items() ])
+        res = dict([ (baseKey+'-links', sum(hat.multiPublish(baseKey+'-links', bodies))) for baseKey, bodies in linksByCollection.items() ])
         log.info("Published: {0} (out of {1})".format(res, len(allLinks)))
                 
         hat.multiAck([ m.delivery_tag for m, d, b in buffer ])
